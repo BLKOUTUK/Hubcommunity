@@ -80,7 +80,7 @@ export const getUserRewards = async (userId: string): Promise<RewardsResponse> =
       nextLevelPoints: 200,
     };
   } catch (error) {
-    logError('Failed to get user rewards', error);
+    logError(error, 'Failed to get user rewards');
     throw error;
   }
 };
@@ -90,7 +90,7 @@ export const syncRewards = async (userId: string): Promise<void> => {
     // Mock implementation
     await new Promise((resolve) => setTimeout(resolve, 1000));
   } catch (error) {
-    logError('Failed to sync rewards', error);
+    logError(error, 'Failed to sync rewards');
     throw error;
   }
 };
@@ -100,7 +100,7 @@ export const awardPoints = async (userId: string, points: number): Promise<void>
     // Mock implementation
     await new Promise((resolve) => setTimeout(resolve, 1000));
   } catch (error) {
-    logError('Failed to award points', error);
+    logError(error, 'Failed to award points');
     throw error;
   }
 };
@@ -114,7 +114,7 @@ export const getLevelProgression = async (userId: string): Promise<{ level: numb
       nextLevelPoints: 200,
     };
   } catch (error) {
-    logError('Failed to get level progression', error);
+    logError(error, 'Failed to get level progression');
     throw error;
   }
 };
@@ -157,7 +157,7 @@ export const getRewards = async (): Promise<RewardsResponse> => {
       nextLevelPoints: 200,
     };
   } catch (error) {
-    logError('Failed to get rewards', error);
+    logError(error, 'Failed to get rewards');
     throw error;
   }
 };
@@ -167,7 +167,7 @@ export const claimReward = async (rewardId: string): Promise<void> => {
     // TODO: Implement actual API call
     await new Promise(resolve => setTimeout(resolve, 1000));
   } catch (error) {
-    logError('Failed to claim reward', error);
+    logError(error, 'Failed to claim reward');
     throw error;
   }
 };
@@ -199,9 +199,9 @@ export const getAvailableRewards = async (): Promise<Reward[]> => {
         name: 'Community Champion',
         description: 'Participate in 5 events',
         points: 150,
-        type: 'monthly',
+        type: 'special',
         claimed: false,
-        type: 'participation'
+        pointsRequired: 0
       }
     ];
   } catch (error) {

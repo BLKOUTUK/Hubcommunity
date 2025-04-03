@@ -26,17 +26,17 @@ export const getUserRewards = async (userId: string): Promise<UserRewards> => {
       streakDays: 5
     };
   } catch (error) {
-    logError(error as Error, 'getUserRewards');
+    logError(error, 'getUserRewards');
     throw error;
   }
 };
 
-export const syncRewards = async (userId: string): Promise<void> => {
+export const syncRewards = async (): Promise<void> => {
   try {
     // TODO: Implement actual API call
     await Promise.resolve();
   } catch (error) {
-    logError(error as Error, 'syncRewards');
+    logError(error, 'syncRewards');
     throw error;
   }
 };
@@ -50,7 +50,7 @@ export const awardPoints = async (
     // TODO: Implement actual API call
     return points;
   } catch (error) {
-    logError(error as Error, 'awardPoints');
+    logError(error, 'awardPoints');
     throw error;
   }
 };
@@ -61,7 +61,7 @@ export const getTopContributors = async (
 ): Promise<TopContributor[]> => {
   try {
     // TODO: Implement actual API call
-    return [
+    const contributors = [
       {
         userId: '1',
         username: 'user1',
@@ -75,8 +75,9 @@ export const getTopContributors = async (
         activities: 40
       }
     ];
+    return contributors.slice(0, limit);
   } catch (error) {
-    logError(error as Error, 'getTopContributors');
+    logError(error, 'getTopContributors');
     throw error;
   }
 };
@@ -114,17 +115,17 @@ export const checkHeartbeat = async (): Promise<HeartbeatResponse> => {
       }
     };
   } catch (error) {
-    logError('Error checking heartbeat', error);
+    logError(error, 'Error checking heartbeat');
     throw error;
   }
 };
 
-export const getServiceStatus = async (serviceName: string): Promise<boolean> => {
+export const getServiceStatus = async (): Promise<boolean> => {
   try {
     // TODO: Implement actual API call
     return true;
   } catch (error) {
-    logError('Error getting service status', error);
+    logError(error, 'Error getting service status');
     throw error;
   }
 };
@@ -134,7 +135,7 @@ export const getUptime = async (): Promise<number> => {
     // TODO: Implement actual API call
     return 99.99;
   } catch (error) {
-    logError('Error getting uptime', error);
+    logError(error, 'Error getting uptime');
     throw error;
   }
 };
@@ -173,7 +174,7 @@ export const monitorServices = async (services: string[]): Promise<ServiceStatus
   }
 };
 
-export const getServiceMetrics = async (service: string): Promise<{
+export const getServiceMetrics = async (): Promise<{
   uptime: number;
   averageResponseTime: number;
   errorRate: number;
@@ -255,12 +256,11 @@ export const monitorService = async (serviceName: string): Promise<HealthCheckRe
           queue: true
         },
         metrics: {
-          responseTime: 50,
+          responseTime: 100,
           errorRate: 0,
-          uptime: 100
+          uptime: 99.99
         }
-      },
-      message: `${serviceName} is healthy`
+      }
     };
   } catch (error) {
     logError(error, 'monitorService');
@@ -284,10 +284,9 @@ export const getSystemMetrics = async (): Promise<SystemStatus['metrics']> => {
 
 export const startHealthMonitoring = async (interval: number = 300000): Promise<void> => {
   try {
-    // TODO: Implement continuous health monitoring
-    setInterval(async () => {
-      await checkSystemHealth();
-    }, interval);
+    // TODO: Implement health monitoring
+    await checkSystemHealth();
+    setTimeout(() => startHealthMonitoring(interval), interval);
   } catch (error) {
     logError(error, 'startHealthMonitoring');
     throw error;

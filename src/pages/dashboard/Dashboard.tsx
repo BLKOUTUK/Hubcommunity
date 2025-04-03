@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { EngagementCard } from '@/components/dashboard/EngagementCard';
-import { CommunityShowcase, TestimonialType } from '@/components/dashboard/CommunityShowcase';
+import { CommunityShowcase } from '@/components/dashboard/CommunityShowcase';
 import { NotificationCard } from '@/components/NotificationCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,8 +17,21 @@ import { CallToAction } from '@/components/CallToAction';
 import { CampaignIntegration } from '@/components/CampaignIntegration';
 import { Link } from 'react-router-dom';
 
+interface Testimonial {
+  id: string;
+  content: string;
+  author: {
+    name: string;
+    avatar: string;
+    role: string;
+  };
+  likes: number;
+  comments: number;
+  date: string;
+}
+
 // Example testimonial data
-const testimonials: TestimonialType[] = [
+const testimonials: Testimonial[] = [
   {
     id: "1",
     content: "Being part of BLKOUTNXT has connected me with mentors and peers who understand my experience. The resources and support have been transformative for my personal and professional growth.",
@@ -71,7 +84,7 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <EngagementCard
             title="Community Contributions"
-            metric="12"
+            metrics="12"
             description="Shared resources and stories"
             progress={75}
             change={8}
@@ -79,7 +92,7 @@ export default function Dashboard() {
           />
           <EngagementCard
             title="Events Attended"
-            metric="4"
+            metrics="4"
             description="Community gatherings and workshops"
             progress={40}
             change={12}
@@ -87,7 +100,7 @@ export default function Dashboard() {
           />
           <EngagementCard
             title="Network Connections"
-            metric="28"
+            metrics="28"
             description="Professional and community connections"
             progress={60}
             change={16}
@@ -95,7 +108,7 @@ export default function Dashboard() {
           />
           <EngagementCard
             title="Personal Growth"
-            metric="85%"
+            metrics="85%"
             description="Progress on your development goals"
             progress={85}
             change={5}
@@ -128,7 +141,10 @@ export default function Dashboard() {
             <TabsTrigger value="events">Upcoming Events</TabsTrigger>
           </TabsList>
           <TabsContent value="community" className="space-y-8">
-            <CommunityShowcase testimonials={testimonials} />
+            <CommunityShowcase 
+              onFollow={(memberId) => console.log('Follow:', memberId)}
+              onUnfollow={(memberId) => console.log('Unfollow:', memberId)}
+            />
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
@@ -164,7 +180,12 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
               
-              <NotificationCard />
+              <NotificationCard 
+                notifications={[]}
+                onMarkAsRead={() => {}}
+                onMarkAllAsRead={() => {}}
+                onDismiss={() => {}}
+              />
             </div>
           </TabsContent>
           <TabsContent value="resources" className="space-y-8">
@@ -214,7 +235,6 @@ export default function Dashboard() {
               description="Contribute resources, articles, or tools that have helped you. Your experience could support another community member's journey."
               buttonText="Submit a Resource"
               buttonHref="/resources/submit"
-              bgColor="bg-gradient-to-r from-purple-600 to-purple-800"
             />
           </TabsContent>
           <TabsContent value="events" className="space-y-8">
@@ -244,43 +264,9 @@ export default function Dashboard() {
                   <Button variant="outline" className="w-full">RSVP</Button>
                 </div>
               </Card>
-              
-              <Card className="flow-card">
-                <CardHeader>
-                  <CardTitle>Wellness Workshop</CardTitle>
-                  <CardDescription>June 29, 2023 • 6:30 PM</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">Learn practices for maintaining mental, emotional, and physical wellbeing as a Black queer man.</p>
-                </CardContent>
-                <div className="p-6 pt-0">
-                  <Button variant="outline" className="w-full">RSVP</Button>
-                </div>
-              </Card>
             </div>
-            
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <MessageSquareIcon className="h-5 w-5 text-primary" />
-                  <CardTitle>Suggest an Event</CardTitle>
-                </div>
-                <CardDescription>
-                  Have an idea for a community gathering or workshop? Let us know!
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full">Submit Event Idea</Button>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
-        
-        {/* Featured Campaign */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Featured Campaign</h2>
-          <CampaignIntegration variant="featured" showTabs={false} />
-        </div>
       </div>
     </DashboardLayout>
   );

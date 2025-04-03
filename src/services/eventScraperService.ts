@@ -32,7 +32,7 @@ export const scrapeEvents = async (sourceUrl: string): Promise<Event[] | null> =
       }
     ];
   } catch (error) {
-    logError('Failed to scrape events', error);
+    logError(error, 'Failed to scrape events');
     return null;
   }
 };
@@ -49,7 +49,7 @@ export const parseEventData = (rawData: any): Event => {
       url: rawData.url || 'https://example.com/event/1'
     };
   } catch (error) {
-    logError('Failed to parse event data', error);
+    logError(error, 'Failed to parse event data');
     throw error;
   }
 };
@@ -68,7 +68,7 @@ export const integrateWithCalendar = async (event: Event): Promise<CalendarInteg
       success: true
     };
   } catch (error) {
-    logError('Failed to integrate with calendar', error);
+    logError(error, 'Failed to integrate with calendar');
     return {
       success: false,
       error: 'Failed to integrate with calendar'
@@ -96,9 +96,12 @@ export const validateEvent = (event: Event): boolean => {
 export const processScrapedEvents = async (url: string): Promise<Event[]> => {
   try {
     const events = await scrapeEvents(url);
+    if (!events) {
+      return [];
+    }
     return events.filter(validateEvent);
   } catch (error) {
     logError(error, 'processScrapedEvents');
-    throw error;
+    return [];
   }
 }; 

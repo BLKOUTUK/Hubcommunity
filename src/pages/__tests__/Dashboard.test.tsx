@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { Dashboard } from '../../pages/Dashboard';
+import Dashboard from '../Dashboard';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Mock the child components
@@ -48,7 +48,14 @@ describe('Dashboard', () => {
     });
 
     render(<Dashboard />);
-    expect(screen.getByText('Community Dashboard')).toBeInTheDocument();
+    const titleElement = screen.getByText(/BLKOUT Dashboard/i);
+    expect(titleElement).toBeInTheDocument();
+  });
+
+  it('renders the dashboard content placeholder', () => {
+    render(<Dashboard />);
+    const contentElement = screen.getByText(/Dashboard content will go here/i);
+    expect(contentElement).toBeInTheDocument();
   });
 
   it('renders the weekly quiz section', () => {

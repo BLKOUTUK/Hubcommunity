@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { CommunityShowcase } from '@/components/dashboard/CommunityShowcase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { NotificationCard } from '@/components/NotificationCard';
+import { NotificationCard, Notification } from '@/components/NotificationCard';
 import { PersonalizedEntryPoints } from '@/components/PersonalizedEntryPoints';
 import { CallToAction } from '@/components/CallToAction';
 import { SignupForm } from '@/components/SignupForm';
@@ -13,127 +13,87 @@ import {
   UserIcon, 
   CalendarIcon, 
   FileTextIcon,
-  HeartIcon
+  HeartIcon,
+  UsersIcon
 } from 'lucide-react';
 
 // Mock data for previewing components
-const mockNotifications = [
+const mockNotifications: Notification[] = [
   {
     id: '1',
     type: 'message',
-    title: 'New message from James',
-    description: 'Hey, I saw your post about the upcoming event. Would love to connect!',
-    time: '2 min ago',
+    title: 'New Message',
+    description: 'You have a new message from Sarah',
+    time: '5m ago',
     read: false,
     actionUrl: '/messages/1',
-    actionLabel: 'Reply',
+    actionLabel: 'View Message',
     user: {
-      name: 'James Wilson',
-      avatar: 'https://i.pravatar.cc/150?img=11',
-    },
+      name: 'Sarah',
+      avatar: '/avatars/sarah.jpg'
+    }
   },
   {
     id: '2',
-    type: 'connection',
-    title: 'New connection request',
-    description: 'Michael Johnson wants to connect with you',
-    time: '1 hour ago',
+    type: 'event',
+    title: 'Event Reminder',
+    description: 'Community meetup starts in 1 hour',
+    time: '1h ago',
     read: false,
-    actionUrl: '/network',
-    actionLabel: 'View Profile',
-    user: {
-      name: 'Michael Johnson',
-      avatar: 'https://i.pravatar.cc/150?img=12',
-    },
+    actionUrl: '/events/1',
+    actionLabel: 'View Event'
   },
   {
     id: '3',
-    type: 'event',
-    title: 'Upcoming Event Reminder',
-    description: 'Community Meetup starts in 2 days. Don\'t forget to RSVP!',
-    time: '3 hours ago',
-    read: true,
-    actionUrl: '/events/5',
-    actionLabel: 'View Event',
-  },
-  {
-    id: '4',
-    type: 'like',
-    title: 'Your post received likes',
-    description: '5 people liked your recent post about mental health resources',
-    time: '1 day ago',
-    read: true,
-  },
-  {
-    id: '5',
     type: 'system',
-    title: 'Profile Completion',
-    description: 'Your profile is 80% complete. Add a bio to reach 100%!',
-    time: '2 days ago',
-    read: true,
-    actionUrl: '/profile/edit',
-    actionLabel: 'Complete Profile',
-  },
+    title: 'System Update',
+    description: 'Platform maintenance scheduled for tonight',
+    time: '2h ago',
+    read: true
+  }
 ];
 
 const mockEngagementMetrics = [
   {
-    label: 'Community Participation',
-    value: 7,
-    total: 10,
-    change: 5,
-    icon: <UserIcon className="h-4 w-4 text-primary" />,
+    title: 'Active Members',
+    metrics: '12',
+    description: 'Members active in the last week',
+    progress: 75,
+    change: 10,
+    icon: <UsersIcon className="h-4 w-4 text-muted-foreground" />
   },
   {
-    label: 'Events Attended',
-    value: 3,
-    total: 8,
-    change: 12,
-    icon: <CalendarIcon className="h-4 w-4 text-primary" />,
-  },
-  {
-    label: 'Resources Accessed',
-    value: 12,
-    total: 20,
-    change: -3,
-    icon: <FileTextIcon className="h-4 w-4 text-primary" />,
-  },
-  {
-    label: 'Messages Exchanged',
-    value: 28,
-    total: 50,
-    change: 15,
-    icon: <MessageSquareIcon className="h-4 w-4 text-primary" />,
-  },
-  {
-    label: 'Connections Made',
-    value: 5,
-    total: 10,
-    change: 0,
-    icon: <HeartIcon className="h-4 w-4 text-primary" />,
-  },
+    title: 'Events',
+    metrics: '4',
+    description: 'Upcoming community events',
+    progress: 60,
+    change: -5,
+    icon: <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+  }
 ];
 
 export default function Preview() {
   const [activeTab, setActiveTab] = useState('community');
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
 
   const handleMarkAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((notification) =>
+    setNotifications(prevNotifications =>
+      prevNotifications.map(notification =>
         notification.id === id ? { ...notification, read: true } : notification
       )
     );
   };
 
   const handleMarkAllAsRead = () => {
-    setNotifications(
-      notifications.map((notification) => ({ ...notification, read: true }))
+    setNotifications(prevNotifications =>
+      prevNotifications.map(notification => ({ ...notification, read: true }))
     );
   };
 
   const handleDismiss = (id: string) => {
-    setNotifications(notifications.filter((notification) => notification.id !== id));
+    setNotifications(prevNotifications =>
+      prevNotifications.filter(notification => notification.id !== id)
+    );
   };
 
   const handleFollow = (id: string) => {
@@ -173,7 +133,14 @@ export default function Preview() {
               
               <div className="mt-8">
                 <h3 className="text-lg font-medium mb-4">Engagement Metrics</h3>
-                <EngagementCard metrics={mockEngagementMetrics} />
+                <EngagementCard
+                  title={mockEngagementMetrics[0].title}
+                  metrics={mockEngagementMetrics[0].metrics}
+                  description={mockEngagementMetrics[0].description}
+                  progress={mockEngagementMetrics[0].progress}
+                  change={mockEngagementMetrics[0].change}
+                  icon={mockEngagementMetrics[0].icon}
+                />
               </div>
             </CardContent>
           </Card>

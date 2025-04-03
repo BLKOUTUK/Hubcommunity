@@ -19,8 +19,69 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CampaignIntegration } from '@/components/CampaignIntegration';
 
+interface CampaignUpdate {
+  id: number;
+  title: string;
+  content: string;
+  date: string;
+  author: string;
+}
+
+interface CampaignEvent {
+  id: number;
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  location: string;
+  virtual: boolean;
+}
+
+interface CampaignResource {
+  id: number;
+  title: string;
+  description: string;
+  type: string;
+  url: string;
+}
+
+interface CampaignSupporter {
+  id: number;
+  name: string;
+  avatar: string;
+  date: string;
+}
+
+interface Campaign {
+  id: string;
+  title: string;
+  description: string;
+  longDescription: string;
+  image: string;
+  coverImage: string;
+  category: string;
+  progress: number;
+  goal: number;
+  participants: number;
+  startDate: string;
+  endDate: string;
+  organizer: {
+    name: string;
+    role: string;
+    avatar: string;
+  };
+  updates: CampaignUpdate[];
+  events: CampaignEvent[];
+  resources: CampaignResource[];
+  supporters: CampaignSupporter[];
+}
+
+interface CampaignData {
+  [key: string]: Campaign;
+}
+
 // Mock campaign data - in a real app, this would come from an API
-const campaignData = {
+const campaignData: CampaignData = {
   'community-support': {
     id: 'community-support',
     title: 'Community Support Initiative',
@@ -219,7 +280,7 @@ const campaignData = {
 };
 
 export default function CampaignDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const [joined, setJoined] = useState(false);
   
   // Get campaign data based on ID
@@ -249,9 +310,8 @@ export default function CampaignDetail() {
   const getDaysRemaining = () => {
     const end = new Date(campaign.endDate);
     const now = new Date();
-    const diffTime = end.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
+    const diff = end.getTime() - now.getTime();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
   
   const handleJoin = () => {

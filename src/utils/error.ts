@@ -1,4 +1,4 @@
-export const logError = (message: string, error: unknown): void => {
+export const logError = (error: unknown, message: string): void => {
   console.error(`[Error] ${message}:`, error);
 };
 

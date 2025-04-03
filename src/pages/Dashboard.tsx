@@ -15,42 +15,21 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="dashboard">
-      <header className="dashboard-header">
-        <h1>Welcome, {user.name}!</h1>
-        <p>Your learning journey starts here.</p>
+    <div className="min-h-screen bg-gray-100">
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-bold text-gray-900">BLKOUT Dashboard</h1>
+        </div>
       </header>
-
-      <div className="dashboard-grid">
-        <section className="quiz-section">
-          <WeeklyQuiz />
-          <DailyBrainTeaser />
-        </section>
-
-        <section className="events-section">
-          <h2>Upcoming Events</h2>
-          {eventsLoading ? (
-            <div>Loading events...</div>
-          ) : eventsError ? (
-            <div className="error-message">{eventsError}</div>
-          ) : (
-            <div className="events-list">
-              {events.map((event) => (
-                <div key={event.id} className="event-card">
-                  <h3>{event.title}</h3>
-                  <p>{event.description}</p>
-                  <small>{new Date(event.date).toLocaleDateString()}</small>
-                </div>
-              ))}
+      <main>
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
+              <p className="text-center text-gray-500">Dashboard content will go here</p>
             </div>
-          )}
-          <EventIntegration />
-        </section>
-
-        <section className="leaderboard-section">
-          <BrainboxOfTheMonth />
-        </section>
-      </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 };
