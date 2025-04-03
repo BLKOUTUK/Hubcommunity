@@ -1,0 +1,425 @@
+{
+  "name": "Survey Responses Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "survey-response-webhook",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Webhook\"].json[\"body\"][\"surveyId\"]}}",
+              "operation": "exists"
+            }
+          ]
+        }
+      },
+      "name": "Is Valid Survey Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get survey response details from the webhook\nconst response = $input.item.json.body;\n\n// Ensure required fields are present\nif (!response.surveyId || !response.userId || !response.answers || !Array.isArray(response.answers)) {\n  return {\n    valid: false,\n    message: \"Missing required fields: surveyId, userId, and answers array are required\"\n  };\n}\n\n// Validate answers\nif (response.answers.length === 0) {\n  return {\n    valid: false,\n    message: \"Survey response must contain at least one answer\"\n  };\n}\n\n// Check that each answer has a questionId and answer\nfor (const answer of response.answers) {\n  if (!answer.questionId || answer.answer === undefined) {\n    return {\n      valid: false,\n      message: \"Each answer must have a questionId and answer value\"\n    };\n  }\n}\n\n// Prepare survey response object with defaults\nconst processedResponse = {\n  surveyId: response.surveyId,\n  userId: response.userId,\n  userName: response.userName || 'Anonymous',\n  answers: response.answers,\n  timestamp: response.timestamp || new Date().toISOString(),\n  source: 'BLKOUTHUB'\n};\n\n// Define points for completing a survey\nconst SURVEY_COMPLETION_POINTS = 20;\n\nreturn {\n  valid: true,\n  response: processedResponse,\n  points: SURVEY_COMPLETION_POINTS,\n  description: `Completed survey ${processedResponse.surveyId}`\n};"
+      },
+      "name": "Process Survey Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        650,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"Process Survey Response\"].json[\"valid\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.VITE_API_URL}}/surveys/responses",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "response",
+              "value": "={{$node[\"Process Survey Response\"].json[\"response\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Store Survey Response API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1050,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.VITE_API_URL}}/rewards/award-points",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "={{$node[\"Process Survey Response\"].json[\"response\"][\"userId\"]}}"
+            },
+            {
+              "name": "points",
+              "value": "={{$node[\"Process Survey Response\"].json[\"points\"]}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$node[\"Process Survey Response\"].json[\"description\"]}}"
+            },
+            {
+              "name": "metadata",
+              "value": "={ \"surveyId\": $node[\"Process Survey Response\"].json.response.surveyId, \"source\": \"BLKOUTHUB\" }"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Award Points API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create success response\nreturn {\n  statusCode: 200,\n  body: {\n    success: true,\n    message: \"Survey response submitted successfully\",\n    responseId: $node[\"Store Survey Response API\"].json.id || \"unknown\",\n    pointsAwarded: $node[\"Process Survey Response\"].json.points\n  }\n};"
+      },
+      "name": "Success Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create error response for invalid survey response\nreturn {\n  statusCode: 400,\n  body: {\n    success: false,\n    message: $node[\"Process Survey Response\"].json.message || \"Invalid survey response submission\"\n  }\n};"
+      },
+      "name": "Error - Invalid Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create error response for missing survey response data\nreturn {\n  statusCode: 400,\n  body: {\n    success: false,\n    message: \"Missing survey response data in request body\"\n  }\n};"
+      },
+      "name": "Error - Missing Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        650,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$node[\"Success Response\"].json.body}}",
+        "options": {
+          "statusCode": "={{$node[\"Success Response\"].json.statusCode}}"
+        }
+      },
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.VITE_HEARTBEAT_API_URL}}/surveys/responses",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "surveyId",
+              "value": "={{$node[\"Process Survey Response\"].json[\"response\"][\"surveyId\"]}}"
+            },
+            {
+              "name": "userId",
+              "value": "={{$node[\"Process Survey Response\"].json[\"response\"][\"userId\"]}}"
+            },
+            {
+              "name": "answers",
+              "value": "={{$node[\"Process Survey Response\"].json[\"response\"][\"answers\"]}}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true
+            }
+          }
+        }
+      },
+      "name": "Sync with Heartbeat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        -50
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Heartbeat API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$env.VITE_API_URL}}/surveys/{{$node[\"Process Survey Response\"].json[\"response\"][\"surveyId\"]}}",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.API_TOKEN}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Survey Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1050,
+        -50
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Survey Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Survey Response": {
+      "main": [
+        [
+          {
+            "node": "Process Survey Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - Missing Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Survey Response": {
+      "main": [
+        [
+          {
+            "node": "Is Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid": {
+      "main": [
+        [
+          {
+            "node": "Store Survey Response API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Survey Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - Invalid Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Survey Response API": {
+      "main": [
+        [
+          {
+            "node": "Award Points API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Award Points API": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Response": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error - Invalid Response": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error - Missing Data": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Survey Details": {
+      "main": [
+        [
+          {
+            "node": "Sync with Heartbeat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "id": "survey-responses",
+  "meta": {
+    "instanceId": "heartbeat-integration"
+  },
+  "tags": [
+    {
+      "name": "heartbeat",
+      "color": "#ff6d6d"
+    },
+    {
+      "name": "surveys",
+      "color": "#31c45b"
+    }
+  ]
+}

@@ -63,6 +63,103 @@ The workflow awards points for the following activities:
 
 You can adjust these point values in the "Process Event" Function node.
 
+### 4. Feedback Collection (`feedback-collection.json`)
+
+This workflow handles feedback submissions from users in the BLKOUTHUB community and awards points for providing feedback.
+
+#### Setup Instructions
+
+1. Import the workflow into your n8n instance:
+   - Go to Workflows > Import from File
+   - Select the `feedback-collection.json` file
+   - Click Import
+
+2. Configure the required environment variables in n8n:
+   - `VITE_API_URL`: The URL of your API (e.g., `http://localhost:3000/api`)
+   - `API_TOKEN`: Authentication token for your API
+   - `VITE_HEARTBEAT_API_URL`: The Heartbeat API URL (e.g., `https://api.heartbeat.chat/v1`)
+
+3. Set up the Heartbeat API credentials (if not already done):
+   - Go to Settings > Credentials
+   - Create a new "HTTP Header Auth" credential
+   - Name it "Heartbeat API"
+   - Set the header name to "Authorization"
+   - Set the header value to "Bearer YOUR_HEARTBEAT_API_KEY"
+
+4. Activate the workflow:
+   - Click the "Activate" toggle in the top-right corner of the workflow editor
+
+5. Get the webhook URL:
+   - Click on the Webhook node
+   - Copy the "Webhook URL" (e.g., `https://your-n8n-instance.com/webhook/feedback-webhook`)
+
+6. Configure your application to send feedback submissions to this webhook URL.
+
+#### How It Works
+
+1. The workflow receives feedback submissions via the Webhook node
+2. It validates the feedback data and processes it
+3. It stores the feedback in your API
+4. It awards points to the user based on the feedback type
+5. It syncs the feedback with Heartbeat
+
+#### Point Values
+
+The workflow awards points for the following feedback types:
+
+| Feedback Type | Description | Points |
+|--------------|-------------|--------|
+| general | General feedback | 5 |
+| feature | Feature request | 10 |
+| bug | Bug report | 10 |
+| content | Content feedback | 8 |
+| event | Event feedback | 8 |
+| survey | Survey feedback | 15 |
+
+You can adjust these point values in the "Process Feedback" Function node.
+
+### 5. Survey Responses (`survey-responses.json`)
+
+This workflow handles survey responses from users in the BLKOUTHUB community and awards points for completing surveys.
+
+#### Setup Instructions
+
+1. Import the workflow into your n8n instance:
+   - Go to Workflows > Import from File
+   - Select the `survey-responses.json` file
+   - Click Import
+
+2. Configure the required environment variables in n8n:
+   - `VITE_API_URL`: The URL of your API (e.g., `http://localhost:3000/api`)
+   - `API_TOKEN`: Authentication token for your API
+   - `VITE_HEARTBEAT_API_URL`: The Heartbeat API URL (e.g., `https://api.heartbeat.chat/v1`)
+
+3. Set up the Heartbeat API credentials (if not already done):
+   - Go to Settings > Credentials
+   - Create a new "HTTP Header Auth" credential
+   - Name it "Heartbeat API"
+   - Set the header name to "Authorization"
+   - Set the header value to "Bearer YOUR_HEARTBEAT_API_KEY"
+
+4. Activate the workflow:
+   - Click the "Activate" toggle in the top-right corner of the workflow editor
+
+5. Get the webhook URL:
+   - Click on the Webhook node
+   - Copy the "Webhook URL" (e.g., `https://your-n8n-instance.com/webhook/survey-response-webhook`)
+
+6. Configure your application to send survey responses to this webhook URL.
+
+#### How It Works
+
+1. The workflow receives survey responses via the Webhook node
+2. It validates the survey response data and processes it
+3. It stores the survey response in your API
+4. It awards points to the user for completing the survey (20 points by default)
+5. It fetches the survey details and syncs the response with Heartbeat
+
+You can adjust the point value for survey completion in the "Process Survey Response" Function node.
+
 ### 2. Eventbrite Scraper (`eventbrite-scraper.json`)
 
 This workflow scrapes event data from Eventbrite and imports it into the platform.
