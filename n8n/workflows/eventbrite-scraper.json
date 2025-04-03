@@ -1,0 +1,399 @@
+{
+  "name": "Eventbrite QTIPOC Scrape report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "daysInterval": 3
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        100
+      ],
+      "id": "204102b0-f87e-46b1-9788-a405b3537a28"
+    },
+    {
+      "parameters": {
+        "url": "https://www.eventbriteapi.com/v3/events/search/?q=black+lgbt+queer+pride+gay+trans&categories=103,104,105,113&location.address=UK&start_date.range_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)&expand=venue,organizer,ticket_availability",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer LFE2HSUANJZB57JJXNYZ"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Eventbrite API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -1000,
+        100
+      ],
+      "id": "593806aa-fed9-4a3f-9631-347bbacccd51"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check if we have events\nif (!items[0].json.events || !Array.isArray(items[0].json.events)) {\n  return [{json: {message: 'No events found or invalid response'}}];\n}\n\n// Process each event\nreturn items[0].json.events.map(event => {\n  // Extract venue details if available\n  let location = 'Online';\n  let locationType = 'online';\n  let locationAddress = '';\n  \n  if (event.venue) {\n    location = event.venue.name || '';\n    locationType = 'in-person';\n    \n    // Build address\n    const addressParts = [];\n    if (event.venue.address && event.venue.address.address_1) {\n      addressParts.push(event.venue.address.address_1);\n    }\n    if (event.venue.address && event.venue.address.city) {\n      addressParts.push(event.venue.address.city);\n    }\n    if (event.venue.address && event.venue.address.postal_code) {\n      addressParts.push(event.venue.address.postal_code);\n    }\n    locationAddress = addressParts.join(', ');\n    \n    // Handle online events\n    if (event.online_event) {\n      locationType = 'hybrid';\n    }\n  } else if (event.online_event) {\n    locationType = 'online';\n    location = 'Online';\n  }\n  \n  // Extract price info\n  let priceInfo = 'Free';\n  if (!event.is_free) {\n    priceInfo = 'Paid';\n  }\n  \n  // Determine if this might be a BLKOUT event (for manual review)\n  const possibleBlkoutEvent = \n    (event.organizer && \n     event.organizer.name && \n     event.organizer.name.toLowerCase().includes('blkout')) || \n    (event.name.text && \n     event.name.text.toLowerCase().includes('blkout'));\n  \n  // Create formatted event object\n  return {\n    json: {\n      Title: event.name.text,\n      Description: event.description.text || event.description.html || '',\n      Start_Date: event.start.utc,\n      End_Date: event.end.utc,\n      Location_Name: location,\n      Location_Address: locationAddress,\n      Location_Type: locationType,\n      Is_Online: locationType === 'online' || locationType === 'hybrid',\n      Category: 'uncategorized', // Default category\n      Is_BLKOUT_Event: possibleBlkoutEvent,\n      Approval_Status: 'pending',\n      Organizer_Name: event.organizer ? event.organizer.name : '',\n      Image_URL: event.logo ? event.logo.url : '',\n      Website_URL: event.url,\n      Ticket_URL: event.url,\n      Price_Info: priceInfo,\n      Source: 'eventbrite',\n      Created_At: new Date().toISOString(),\n      Updated_At: new Date().toISOString(),\n      External_ID: 'eventbrite-' + event.id\n    }\n  };\n});\n"
+      },
+      "name": "Transform Eventbrite Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        100
+      ],
+      "id": "5475c023-c6fc-4b6c-85ad-6e6f91273038"
+    },
+    {
+      "parameters": {
+        "functionCode": "// This function filters events to ensure they're relevant\n// to the Black LGBTQ+ community\n\nconst relevantEvents = [];\n\n// Keywords that indicate relevance to Black LGBTQ+ community\nconst blackKeywords = ['black', 'afro', 'african', 'caribbean', 'poc', 'people of color', 'people of colour'];\nconst lgbtqKeywords = ['lgbtq', 'lgbt', 'queer', 'gay', 'lesbian', 'trans', 'transgender', 'bisexual', 'non-binary', 'nonbinary', 'pride'];\n\nfor (const item of items) {\n  const event = item.json;\n  const combinedText = `${event.Title} ${event.Description}`.toLowerCase();\n  \n  // Check if the event mentions both Black and LGBTQ+ themes\n  const hasBlackKeyword = blackKeywords.some(keyword => combinedText.includes(keyword));\n  const hasLgbtqKeyword = lgbtqKeywords.some(keyword => combinedText.includes(keyword));\n  \n  // If the event is already marked as a BLKOUT event, include it\n  if (event.Is_BLKOUT_Event) {\n    relevantEvents.push(item);\n    continue;\n  }\n  \n  // If the event mentions both Black and LGBTQ+ themes, include it\n  if (hasBlackKeyword && hasLgbtqKeyword) {\n    relevantEvents.push(item);\n    continue;\n  }\n  \n  // If the organizer is known to be relevant, include it\n  const relevantOrganizers = ['blkout', 'black pride', 'uk black pride', 'black queer', 'rainbow noir', 'radical rhizomes', 'queer bruk', 'naz project', 'Africa Rainbow', 'unmuted';];\n  if (event.Organizer_Name && \n      relevantOrganizers.some(org => event.Organizer_Name.toLowerCase().includes(org))) {\n    relevantEvents.push(item);\n    continue;\n  }\n}\n\nreturn relevantEvents;\n"
+      },
+      "name": "Filter Relevant Events",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        100
+      ],
+      "id": "48547401-0e36-49ae-8575-037daa56dfcd"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appPRvjVTO8DqDLdy",
+          "mode": "list",
+          "cachedResultName": "Events_Calendar",
+          "cachedResultUrl": "https://airtable.com/appPRvjVTO8DqDLdy"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblsmWC01IVYE7iiC",
+          "mode": "list",
+          "cachedResultName": "Events",
+          "cachedResultUrl": "https://airtable.com/appPRvjVTO8DqDLdy/tblsmWC01IVYE7iiC"
+        },
+        "options": {
+          "fields": "={{ [\"Title\",\"Start date\",\"Last updated\"] }}"
+        },
+        "sort": {
+          "property": [
+            {},
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -380,
+        100
+      ],
+      "id": "fb6dfc38-8040-4873-8d21-47af6ce8432e",
+      "name": "Airtable",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "t7R4OUU1xDhKacuZ",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"Check Existing Events\"].json[\"length\"] > 0}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        100
+      ],
+      "id": "a33a1808-7b37-4847-870a-b8582e0f617e"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "application": "={{$node[\"Credentials\"].json[\"airtable_base_id\"]}}",
+        "table": "Events"
+      },
+      "name": "Create New Event",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d112d167-d333-40d4-8dcd-d467511d9ab6",
+      "credentials": {
+        "airtableApi": {
+          "id": null,
+          "name": "Airtable API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "application": "={{$node[\"Credentials\"].json[\"airtable_base_id\"]}}",
+        "table": "Events",
+        "id": "={{$node[\"Check Existing Events\"].json[0].id}}",
+        "options": {}
+      },
+      "name": "Update Existing Event",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "5cce7724-d5a3-4832-b67e-0558f6686ebd",
+      "credentials": {
+        "airtableApi": {
+          "id": null,
+          "name": "Airtable API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "document": {
+          "__rl": true,
+          "value": "1BqXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+          "mode": "list",
+          "cachedResultName": "Eventbrite Events",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1BqXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        },
+        "sheetName": "Events",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Title": "={{$json.Title}}",
+            "Description": "={{$json.Description}}",
+            "Start Date": "={{$json.Start_Date}}",
+            "End Date": "={{$json.End_Date}}",
+            "Location": "={{$json.Location_Name}}",
+            "Address": "={{$json.Location_Address}}",
+            "Type": "={{$json.Location_Type}}",
+            "Online": "={{$json.Is_Online}}",
+            "Category": "={{$json.Category}}",
+            "BLKOUT Event": "={{$json.Is_BLKOUT_Event}}",
+            "Status": "={{$json.Approval_Status}}",
+            "Organizer": "={{$json.Organizer_Name}}",
+            "Image URL": "={{$json.Image_URL}}",
+            "Website": "={{$json.Website_URL}}",
+            "Tickets": "={{$json.Ticket_URL}}",
+            "Price": "={{$json.Price_Info}}",
+            "Source": "={{$json.Source}}",
+            "Created": "={{$json.Created_At}}",
+            "Updated": "={{$json.Updated_At}}",
+            "External ID": "={{$json.External_ID}}"
+          }
+        },
+        "options": {
+          "range": "A:Z"
+        }
+      },
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        200,
+        0
+      ],
+      "id": "google-sheets-node",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credentials",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "berkeley@blkoutuk.com",
+        "toEmail": "rob@blkoutuk.com",
+        "subject": "BLKOUT UK Event Scraper - Execution Summary",
+        "text": "=The Eventbrite event scraper workflow completed at {{$now.format(\"YYYY-MM-DD HH:mm:ss\")}}.\n\nEvents found: {{$node[\"Transform Eventbrite Data\"].json[\"length\"]}}\nRelevant events: {{$node[\"Filter Relevant Events\"].json[\"length\"]}}\nNew events added: {{$node[\"Create New Event\"].json[\"length\"]}}\nEvents updated: {{$node[\"Update Existing Event\"].json[\"length\"]}}\nEvents synced to Google Sheets: {{$node[\"Google Sheets\"].json[\"length\"]}}\n\nWorkflow execution ID: {{$execution.id}}\n",
+        "options": {}
+      },
+      "name": "Send Email Summary",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        100
+      ],
+      "id": "a5841c4b-2bbf-4ac2-bdc7-94ef178a6314",
+      "credentials": {
+        "smtp": {
+          "id": "JqRN7Dtgrun0BAZC",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "eventbrite_api_key",
+              "value": "YOUR_EVENTBRITE_API_KEY"
+            },
+            {
+              "name": "airtable_base_id",
+              "value": "YOUR_AIRTABLE_BASE_ID"
+            },
+            {
+              "name": "google_sheets_id",
+              "value": "YOUR_GOOGLE_SHEETS_ID"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Credentials",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        300
+      ],
+      "id": "6583261f-32f1-40e1-bf30-7b1ecec55172"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Eventbrite API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventbrite API": {
+      "main": [
+        [
+          {
+            "node": "Transform Eventbrite Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Eventbrite Data": {
+      "main": [
+        [
+          {
+            "node": "Filter Relevant Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Relevant Events": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Create New Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Existing Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Event": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing Event": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Send Email Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ea2f0602-6abb-496c-89a7-770f0ae5c779",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2a1ffccfa13a85291b4359d4be07dbea41f670a90dda49dbea52bae3e90cc489"
+  },
+  "id": "IlCjySCvyC6s7Pwk",
+  "tags": []
+} 

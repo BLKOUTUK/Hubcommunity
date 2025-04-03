@@ -1,0 +1,307 @@
+{
+  "name": "BLKOUT UK - Eventbrite Event Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "minutesInterval": 0,
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.eventbriteapi.com/v3/events/search/",
+        "authentication": "headerAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$node[\"Credentials\"].json[\"eventbrite_api_key\"]}}"
+            }
+          ]
+        },
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "black lgbtq OR black queer OR blkout"
+            },
+            {
+              "name": "location.address",
+              "value": "United Kingdom"
+            },
+            {
+              "name": "start_date.range_start",
+              "value": "={{$now.format(\"YYYY-MM-DD\")}}"
+            },
+            {
+              "name": "start_date.range_end",
+              "value": "={{$now.plus(3, \"months\").format(\"YYYY-MM-DD\")}}"
+            },
+            {
+              "name": "expand",
+              "value": "venue,organizer"
+            }
+          ]
+        }
+      },
+      "name": "Eventbrite API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check if we have events\nif (!items[0].json.events || !Array.isArray(items[0].json.events)) {\n  return [{json: {message: 'No events found or invalid response'}}];\n}\n\n// Process each event\nreturn items[0].json.events.map(event => {\n  // Extract venue details if available\n  let location = 'Online';\n  let locationType = 'online';\n  let locationAddress = '';\n  \n  if (event.venue) {\n    location = event.venue.name || '';\n    locationType = 'in-person';\n    \n    // Build address\n    const addressParts = [];\n    if (event.venue.address && event.venue.address.address_1) {\n      addressParts.push(event.venue.address.address_1);\n    }\n    if (event.venue.address && event.venue.address.city) {\n      addressParts.push(event.venue.address.city);\n    }\n    if (event.venue.address && event.venue.address.postal_code) {\n      addressParts.push(event.venue.address.postal_code);\n    }\n    locationAddress = addressParts.join(', ');\n    \n    // Handle online events\n    if (event.online_event) {\n      locationType = 'hybrid';\n    }\n  } else if (event.online_event) {\n    locationType = 'online';\n    location = 'Online';\n  }\n  \n  // Extract price info\n  let priceInfo = 'Free';\n  if (!event.is_free) {\n    priceInfo = 'Paid';\n  }\n  \n  // Determine if this might be a BLKOUT event (for manual review)\n  const possibleBlkoutEvent = \n    (event.organizer && \n     event.organizer.name && \n     event.organizer.name.toLowerCase().includes('blkout')) || \n    (event.name.text && \n     event.name.text.toLowerCase().includes('blkout'));\n  \n  // Create formatted event object\n  return {\n    json: {\n      Title: event.name.text,\n      Description: event.description.text || event.description.html || '',\n      Start_Date: event.start.utc,\n      End_Date: event.end.utc,\n      Location_Name: location,\n      Location_Address: locationAddress,\n      Location_Type: locationType,\n      Is_Online: locationType === 'online' || locationType === 'hybrid',\n      Category: 'uncategorized', // Default category\n      Is_BLKOUT_Event: possibleBlkoutEvent,\n      Approval_Status: 'pending',\n      Organizer_Name: event.organizer ? event.organizer.name : '',\n      Image_URL: event.logo ? event.logo.url : '',\n      Website_URL: event.url,\n      Ticket_URL: event.url,\n      Price_Info: priceInfo,\n      Source: 'eventbrite',\n      Created_At: new Date().toISOString(),\n      Updated_At: new Date().toISOString(),\n      External_ID: 'eventbrite-' + event.id\n    }\n  };\n});\n"
+      },
+      "name": "Transform Eventbrite Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// This function filters events to ensure they're relevant\n// to the Black LGBTQ+ community\n\nconst relevantEvents = [];\n\n// Keywords that indicate relevance to Black LGBTQ+ community\nconst blackKeywords = ['black', 'afro', 'african', 'caribbean', 'poc', 'people of color', 'people of colour'];\nconst lgbtqKeywords = ['lgbtq', 'lgbt', 'queer', 'gay', 'lesbian', 'trans', 'transgender', 'bisexual', 'non-binary', 'nonbinary', 'pride'];\n\nfor (const item of items) {\n  const event = item.json;\n  const combinedText = `${event.Title} ${event.Description}`.toLowerCase();\n  \n  // Check if the event mentions both Black and LGBTQ+ themes\n  const hasBlackKeyword = blackKeywords.some(keyword => combinedText.includes(keyword));\n  const hasLgbtqKeyword = lgbtqKeywords.some(keyword => combinedText.includes(keyword));\n  \n  // If the event is already marked as a BLKOUT event, include it\n  if (event.Is_BLKOUT_Event) {\n    relevantEvents.push(item);\n    continue;\n  }\n  \n  // If the event mentions both Black and LGBTQ+ themes, include it\n  if (hasBlackKeyword && hasLgbtqKeyword) {\n    relevantEvents.push(item);\n    continue;\n  }\n  \n  // If the organizer is known to be relevant, include it\n  const relevantOrganizers = ['blkout', 'black pride', 'uk black pride', 'black queer'];\n  if (event.Organizer_Name && \n      relevantOrganizers.some(org => event.Organizer_Name.toLowerCase().includes(org))) {\n    relevantEvents.push(item);\n    continue;\n  }\n}\n\nreturn relevantEvents;\n"
+      },
+      "name": "Filter Relevant Events",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "application": "={{$node[\"Credentials\"].json[\"airtable_base_id\"]}}",
+        "table": "Events",
+        "options": {
+          "filterByFormula": "={External_ID} = \"{{$json[\"External_ID\"]}}\""
+        }
+      },
+      "name": "Check Existing Events",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ],
+      "credentials": {
+        "airtableApi": "Airtable API"
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"Check Existing Events\"].json[\"length\"] > 0}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "application": "={{$node[\"Credentials\"].json[\"airtable_base_id\"]}}",
+        "table": "Events",
+        "options": {}
+      },
+      "name": "Create New Event",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        200
+      ],
+      "credentials": {
+        "airtableApi": "Airtable API"
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "eventbrite_api_key",
+              "value": "YOUR_EVENTBRITE_API_KEY"
+            },
+            {
+              "name": "airtable_base_id",
+              "value": "YOUR_AIRTABLE_BASE_ID"
+            }
+          ]
+        }
+      },
+      "name": "Credentials",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        250,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "application": "={{$node[\"Credentials\"].json[\"airtable_base_id\"]}}",
+        "table": "Events",
+        "id": "={{$node[\"Check Existing Events\"].json[0].id}}",
+        "options": {}
+      },
+      "name": "Update Existing Event",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        400
+      ],
+      "credentials": {
+        "airtableApi": "Airtable API"
+      }
+    },
+    {
+      "parameters": {
+        "subject": "BLKOUT UK Event Scraper - Execution Summary",
+        "to": "{{$node[\"Credentials\"].json[\"notification_email\"]}}",
+        "text": "=The Eventbrite event scraper workflow completed at {{$now.format(\"YYYY-MM-DD HH:mm:ss\")}}.\n\nEvents found: {{$node[\"Transform Eventbrite Data\"].json[\"length\"]}}\nRelevant events: {{$node[\"Filter Relevant Events\"].json[\"length\"]}}\nNew events added: {{$node[\"Create New Event\"].json[\"length\"]}}\nEvents updated: {{$node[\"Update Existing Event\"].json[\"length\"]}}\n\nWorkflow execution ID: {{$execution.id}}\n"
+      },
+      "name": "Send Email Summary",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        300
+      ],
+      "credentials": {
+        "smtp": "SMTP"
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Eventbrite API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventbrite API": {
+      "main": [
+        [
+          {
+            "node": "Transform Eventbrite Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Eventbrite Data": {
+      "main": [
+        [
+          {
+            "node": "Filter Relevant Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Relevant Events": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Events": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Create New Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Existing Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Event": {
+      "main": [
+        [
+          {
+            "node": "Send Email Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing Event": {
+      "main": [
+        [
+          {
+            "node": "Send Email Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

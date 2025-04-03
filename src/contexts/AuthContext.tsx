@@ -1,40 +1,60 @@
-
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error?: Error, data?: { user: User | null } }>;
-  signOut: () => Promise<void>;
-}
+import { User, AuthContextType } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [authState, setAuthState] = useState<AuthContextType>({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+    error: null,
+    login: async () => {},
+    logout: async () => {},
+    register: async () => {},
+    updateProfile: async () => {}
+  });
+
   const { toast } = useToast();
+
+  const transformSupabaseUser = (supabaseUser: SupabaseUser | null): User | null => {
+    if (!supabaseUser) return null;
+    
+    return {
+      id: supabaseUser.id,
+      name: supabaseUser.user_metadata?.full_name || 'Anonymous User',
+      email: supabaseUser.email || '',
+      role: supabaseUser.user_metadata?.role || 'user',
+      points: 0,
+      avatar: supabaseUser.user_metadata?.avatar_url,
+      createdAt: supabaseUser.created_at,
+      updatedAt: new Date().toISOString()
+    };
+  };
 
   useEffect(() => {
     // Check active session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      setAuthState(prev => ({
+        ...prev,
+        user: transformSupabaseUser(session?.user ?? null),
+        isAuthenticated: !!session,
+        isLoading: false
+      }));
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+        setAuthState(prev => ({
+          ...prev,
+          user: transformSupabaseUser(session?.user ?? null),
+          isAuthenticated: !!session,
+          isLoading: false
+        }));
       }
     );
 
@@ -43,100 +63,161 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const login = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      if (error) {
-        toast({
-          title: "Login failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        throw error;
-      }
-      
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) throw error;
+
       toast({
-        title: "Login successful",
-        description: "Welcome back!",
+        title: 'Success',
+        description: 'You have been logged in successfully.'
       });
     } catch (error) {
-      throw error;
+      setAuthState(prev => ({
+        ...prev,
+        error: 'Failed to login',
+        isLoading: false
+      }));
+      toast({
+        title: 'Error',
+        description: 'Failed to login. Please check your credentials.',
+        variant: 'destructive'
+      });
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const logout = async () => {
     try {
-      // First check if seats are available
-      const { data: seatsAvailable } = await supabase.rpc('are_seats_available');
+      setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      if (!seatsAvailable) {
-        toast({
-          title: "Registration failed",
-          description: "All available seats are taken. Please contact the administrator.",
-          variant: "destructive",
-        });
-        return { error: new Error("No seats available") };
-      }
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'You have been logged out successfully.'
+      });
+    } catch (error) {
+      setAuthState(prev => ({
+        ...prev,
+        error: 'Failed to logout',
+        isLoading: false
+      }));
+      toast({
+        title: 'Error',
+        description: 'Failed to logout. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const register = async (userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      const { error, data } = await supabase.auth.signUp({ 
-        email, 
-        password,
+      const { error } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.email, // In a real app, you'd have a separate password field
         options: {
           data: {
-            full_name: fullName,
+            full_name: userData.name,
+            role: userData.role,
+            avatar_url: userData.avatar
           }
         }
       });
-      
-      if (error) {
-        toast({
-          title: "Registration failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return { error };
-      }
-      
-      return { data };
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Your account has been created successfully.'
+      });
     } catch (error) {
-      return { error: error instanceof Error ? error : new Error('Unknown error') };
+      setAuthState(prev => ({
+        ...prev,
+        error: 'Failed to register',
+        isLoading: false
+      }));
+      toast({
+        title: 'Error',
+        description: 'Failed to create account. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
 
-  const signOut = async () => {
+  const updateProfile = async (userData: Partial<User>) => {
     try {
-      await supabase.auth.signOut();
+      setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
+      
+      if (!authState.user) {
+        throw new Error('No user logged in');
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: userData.name,
+          role: userData.role,
+          avatar_url: userData.avatar
+        }
+      });
+
+      if (error) throw error;
+
+      setAuthState(prev => ({
+        ...prev,
+        user: {
+          ...prev.user!,
+          ...userData,
+          updatedAt: new Date().toISOString()
+        },
+        isLoading: false
+      }));
+
       toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
+        title: 'Success',
+        description: 'Your profile has been updated successfully.'
       });
     } catch (error) {
-      console.error('Error signing out:', error);
+      setAuthState(prev => ({
+        ...prev,
+        error: 'Failed to update profile',
+        isLoading: false
+      }));
       toast({
-        title: "Error",
-        description: "There was a problem signing out.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update profile. Please try again.',
+        variant: 'destructive'
       });
     }
   };
 
-  const value = {
-    user,
-    session,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-  };
+  return (
+    <AuthContext.Provider
+      value={{
+        ...authState,
+        login,
+        logout,
+        register,
+        updateProfile
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};

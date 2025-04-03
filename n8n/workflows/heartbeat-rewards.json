@@ -1,0 +1,330 @@
+{
+  "name": "Heartbeat Rewards Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "heartbeat-webhook",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Webhook\"].json[\"headers\"][\"x-heartbeat-event\"]}}",
+              "operation": "exists"
+            }
+          ]
+        }
+      },
+      "name": "Is Valid Heartbeat Event",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get event details from the webhook\nconst eventType = $input.item.json.headers[\"x-heartbeat-event\"];\nconst signature = $input.item.json.headers[\"x-heartbeat-signature\"];\nconst payload = $input.item.json.body;\n\n// Define point values for different activities\nconst ACTIVITY_POINTS = {\n  USER_JOIN: 50,           // New user joins the community\n  EVENT_RSVP: 10,          // User RSVPs to an event\n  THREAD_CREATE: 15,       // User creates a new thread\n  MENTION: 5,              // User mentions someone\n  RESOURCE_SHARE: 20,      // User shares a resource\n  COURSE_COMPLETED: 30,    // User completes a course\n  GROUP_JOIN: 10,          // User joins a group\n};\n\n// Extract user ID based on event type\nlet userId;\nlet description;\nlet points;\nlet metadata = {};\n\nswitch(eventType) {\n  case 'USER_JOIN':\n    userId = payload.id;\n    description = 'Joined the BLKOUTHUB community';\n    points = ACTIVITY_POINTS.USER_JOIN;\n    metadata = { action: 'USER_JOIN' };\n    break;\n    \n  case 'EVENT_RSVP':\n    userId = payload.userID;\n    description = `RSVP'd to an event`;\n    points = ACTIVITY_POINTS.EVENT_RSVP;\n    metadata = { action: 'EVENT_RSVP', eventID: payload.eventID };\n    break;\n    \n  case 'THREAD_CREATE':\n    // In a real implementation, we would need to get the user ID from the thread\n    // For now, we'll assume it's included in the payload\n    userId = payload.userID || 'unknown';\n    description = 'Created a new discussion thread';\n    points = ACTIVITY_POINTS.THREAD_CREATE;\n    metadata = { action: 'THREAD_CREATE', threadId: payload.id, channelID: payload.channelID };\n    break;\n    \n  case 'MENTION':\n    userId = payload.userID;\n    description = `Mentioned ${payload.mentionedUsers.length} user(s)`;\n    points = ACTIVITY_POINTS.MENTION;\n    metadata = { action: 'MENTION', mentionedUsers: payload.mentionedUsers };\n    break;\n    \n  case 'COURSE_COMPLETED':\n    userId = payload.userID;\n    description = `Completed course: ${payload.courseName}`;\n    points = ACTIVITY_POINTS.COURSE_COMPLETED;\n    metadata = { action: 'COURSE_COMPLETED', courseID: payload.courseID };\n    break;\n    \n  case 'GROUP_JOIN':\n    userId = payload.userID;\n    description = 'Joined a community group';\n    points = ACTIVITY_POINTS.GROUP_JOIN;\n    metadata = { action: 'GROUP_JOIN', groupID: payload.groupID };\n    break;\n    \n  default:\n    // Unknown event type\n    return {\n      eventType,\n      userId: null,\n      description: null,\n      points: 0,\n      metadata: {},\n      processable: false\n    };\n}\n\nreturn {\n  eventType,\n  userId,\n  description,\n  points,\n  metadata,\n  processable: !!userId && !!points\n};"
+      },
+      "name": "Process Event",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        650,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"Process Event\"].json[\"processable\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Can Award Points",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.VITE_API_URL}}/rewards/award-points",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "={{$node[\"Process Event\"].json[\"userId\"]}}"
+            },
+            {
+              "name": "points",
+              "value": "={{$node[\"Process Event\"].json[\"points\"]}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$node[\"Process Event\"].json[\"description\"]}}"
+            },
+            {
+              "name": "metadata",
+              "value": "={{$node[\"Process Event\"].json[\"metadata\"]}}"
+            },
+            {
+              "name": "source",
+              "value": "BLKOUTHUB"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Award Points API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1050,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create success response\nreturn {\n  statusCode: 200,\n  body: {\n    success: true,\n    message: `Successfully processed ${$node[\"Process Event\"].json.eventType} event`,\n    userId: $node[\"Process Event\"].json.userId,\n    points: $node[\"Process Event\"].json.points,\n    description: $node[\"Process Event\"].json.description\n  }\n};"
+      },
+      "name": "Success Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create error response for invalid event\nreturn {\n  statusCode: 400,\n  body: {\n    success: false,\n    message: \"Cannot process event: missing user ID or points\",\n    eventType: $node[\"Process Event\"].json.eventType\n  }\n};"
+      },
+      "name": "Error - Cannot Process",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create error response for invalid Heartbeat event\nreturn {\n  statusCode: 400,\n  body: {\n    success: false,\n    message: \"Invalid Heartbeat event: missing x-heartbeat-event header\"\n  }\n};"
+      },
+      "name": "Error - Invalid Event",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        650,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$node[\"Success Response\"].json.body}}",
+        "options": {
+          "statusCode": "={{$node[\"Success Response\"].json.statusCode}}"
+        }
+      },
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.VITE_HEARTBEAT_API_URL}}/users/{{$node[\"Process Event\"].json.userId}}/rewards",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true
+            }
+          }
+        }
+      },
+      "name": "Get User Rewards",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1050,
+        -50
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Heartbeat API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Heartbeat Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Heartbeat Event": {
+      "main": [
+        [
+          {
+            "node": "Process Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - Invalid Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Event": {
+      "main": [
+        [
+          {
+            "node": "Can Award Points",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Award Points": {
+      "main": [
+        [
+          {
+            "node": "Award Points API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get User Rewards",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - Cannot Process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Award Points API": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Response": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error - Cannot Process": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error - Invalid Event": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "id": "heartbeat-rewards",
+  "meta": {
+    "instanceId": "heartbeat-integration"
+  },
+  "tags": [
+    {
+      "name": "heartbeat",
+      "color": "#ff6d6d"
+    },
+    {
+      "name": "rewards",
+      "color": "#31c45b"
+    }
+  ]
+}

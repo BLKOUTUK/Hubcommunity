@@ -13,6 +13,7 @@ import {
   SettingsIcon,
   UserIcon,
   Users2Icon,
+  GiftIcon,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -182,6 +183,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   label={collapsed ? '' : "Network"}
                   href="/network"
                   active={path === '/network'}
+                />
+                <SidebarItem
+                  icon={<GiftIcon className="h-4 w-4" />}
+                  label={collapsed ? '' : "Rewards"}
+                  href="/dashboard/rewards"
+                  active={path === '/dashboard/rewards'}
                 />
               </div>
             </ScrollArea>

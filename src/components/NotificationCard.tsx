@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Link } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { 
   BellIcon, 
@@ -13,9 +15,11 @@ import {
   XIcon
 } from 'lucide-react';
 
-interface Notification {
+export type NotificationType = 'system' | 'message' | 'connection' | 'event' | 'like';
+
+export interface Notification {
   id: string;
-  type: 'message' | 'connection' | 'event' | 'like' | 'system';
+  type: NotificationType;
   title: string;
   description: string;
   time: string;
@@ -28,20 +32,20 @@ interface Notification {
   };
 }
 
-interface NotificationCardProps {
+export interface NotificationCardProps {
   notifications: Notification[];
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
   onDismiss: (id: string) => void;
 }
 
-export function NotificationCard({ 
-  notifications, 
-  onMarkAsRead, 
+export function NotificationCard({
+  notifications,
+  onMarkAsRead,
   onMarkAllAsRead,
-  onDismiss
+  onDismiss,
 }: NotificationCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = React.useState(false);
   
   const unreadCount = notifications.filter(n => !n.read).length;
   const displayNotifications = expanded 
@@ -71,135 +75,72 @@ export function NotificationCard({
 
   return (
     <Card className="w-full max-w-md shadow-lg border-border">
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between p-4 bg-muted/50">
-          <div className="flex items-center gap-2">
-            <BellIcon className="h-5 w-5" />
-            <h3 className="font-medium">Notifications</h3>
-            {unreadCount > 0 && (
-              <span className="inline-flex h-5 items-center justify-center rounded-full bg-primary px-2 text-xs font-medium text-primary-foreground">
-                {unreadCount}
-              </span>
-            )}
-          </div>
-          {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onMarkAllAsRead}
-              className="text-xs h-8"
-            >
-              Mark all as read
-            </Button>
-          )}
-        </div>
-        
-        <div className="max-h-[350px] overflow-y-auto">
-          {displayNotifications.length > 0 ? (
-            <>
-              {displayNotifications.map((notification, index) => (
-                <div key={notification.id}>
-                  <div 
-                    className={`relative p-4 ${notification.read ? '' : 'bg-primary/5'}`}
-                    onClick={() => handleNotificationClick(notification)}
-                  >
-                    <div className="flex gap-3">
-                      {notification.user ? (
-                        <div className="h-10 w-10 rounded-full overflow-hidden flex-shrink-0">
-                          <img 
-                            src={notification.user.avatar} 
-                            alt={notification.user.name}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 bg-primary/10`}>
-                          {getIcon(notification.type)}
-                        </div>
-                      )}
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-sm">{notification.title}</p>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {notification.time}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {notification.description}
-                        </p>
-                        
-                        {notification.actionUrl && notification.actionLabel && (
-                          <div className="mt-2">
-                            <Link 
-                              to={notification.actionUrl}
-                              className="text-xs font-medium text-primary hover:underline"
-                            >
-                              {notification.actionLabel}
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="absolute top-4 right-4 flex gap-1">
-                      {!notification.read && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onMarkAsRead(notification.id);
-                          }}
-                        >
-                          <CheckIcon className="h-3 w-3" />
-                          <span className="sr-only">Mark as read</span>
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDismiss(notification.id);
-                        }}
-                      >
-                        <XIcon className="h-3 w-3" />
-                        <span className="sr-only">Dismiss</span>
-                      </Button>
-                    </div>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">Notifications</CardTitle>
+        <Button variant="outline" size="sm" onClick={onMarkAllAsRead}>
+          Mark all as read
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <ScrollArea className="h-[300px]">
+          <div className="space-y-4">
+            {displayNotifications.map((notification) => (
+              <div
+                key={notification.id}
+                className="flex items-start gap-4 rounded-lg border p-3"
+              >
+                {notification.user?.avatar && (
+                  <img
+                    src={notification.user.avatar}
+                    alt={notification.user.name}
+                    className="h-8 w-8 rounded-full"
+                  />
+                )}
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium leading-none">
+                      {notification.title}
+                    </p>
+                    {!notification.read && (
+                      <Badge variant="default" className="h-1.5 w-1.5 rounded-full p-0" />
+                    )}
                   </div>
-                  {index < displayNotifications.length - 1 && <Separator />}
+                  <p className="text-sm text-muted-foreground">
+                    {notification.description}
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <p className="text-xs text-muted-foreground">
+                      {notification.time}
+                    </p>
+                    {notification.actionUrl && (
+                      <Button variant="link" size="sm" asChild>
+                        <a href={notification.actionUrl}>{notification.actionLabel}</a>
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              ))}
-              
-              {notifications.length > 3 && (
-                <div className="p-3 text-center">
+                <div className="flex gap-2">
+                  {!notification.read && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onMarkAsRead(notification.id)}
+                    >
+                      Mark as read
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setExpanded(!expanded)}
-                    className="text-xs"
+                    onClick={() => onDismiss(notification.id)}
                   >
-                    {expanded ? "Show less" : `Show ${notifications.length - 3} more`}
+                    Dismiss
                   </Button>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="py-8 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <BellIcon className="h-6 w-6 text-muted-foreground" />
               </div>
-              <h3 className="mt-4 text-sm font-medium">No notifications</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                When you get notifications, they'll show up here.
-              </p>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   );
