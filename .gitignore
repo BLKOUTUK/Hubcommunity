@@ -1,3 +1,7 @@
+# Ignore archive and old directories
+/archive/
+/mcp-server-app/
+
 # Environment variables
 .env
 
