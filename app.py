@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Ensure data directory exists
+os.makedirs('data', exist_ok=True)
+
 # Set up logging
 log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 log_file = 'blkout_nxt.log'
@@ -22,6 +25,14 @@ log_handler.setLevel(logging.INFO)
 app_logger = logging.getLogger('blkout_nxt')
 app_logger.setLevel(logging.INFO)
 app_logger.addHandler(log_handler)
+
+# Add console logging for Render
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+console_handler.setLevel(logging.INFO)
+app_logger.addHandler(console_handler)
+
+app_logger.info("Starting BLKOUT NXT Backend")
 
 # Import our custom modules
 from member_manager import MemberManager
