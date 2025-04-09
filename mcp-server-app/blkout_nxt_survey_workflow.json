@@ -1,0 +1,439 @@
+{
+  "name": "BLKOUT NXT Survey Follow-up",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Members for Survey",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filter for members who received welcome email but not survey\nconst members = $input.all()[0].json;\n\n// Filter for members with OnboardingStatus = 'Welcome Sent'\nconst eligibleMembers = members.filter(member => {\n  const status = member.OnboardingStatus || '';\n  const emailHistory = member.EmailHistory || '';\n  const lastEmailDate = member.LastEmailSent || '';\n  \n  // Check if they received welcome email but not survey\n  const receivedWelcome = status === 'Welcome Sent' || emailHistory.includes('Welcome');\n  const receivedSurvey = emailHistory.includes('Survey');\n  \n  // Only send survey if welcome was sent at least 3 days ago\n  let daysSinceWelcome = 0;\n  if (lastEmailDate) {\n    const lastEmailTime = new Date(lastEmailDate).getTime();\n    const currentTime = new Date().getTime();\n    daysSinceWelcome = Math.floor((currentTime - lastEmailTime) / (1000 * 60 * 60 * 24));\n  }\n  \n  return receivedWelcome && !receivedSurvey && daysSinceWelcome >= 3;\n});\n\nconsole.log(`Found ${eligibleMembers.length} members ready for survey follow-up`);\n\n// Determine segment for each eligible member\nreturn eligibleMembers.map(member => {\n  // Extract segment from Notes field or determine from Role\n  let segment = '';\n  \n  // First try to get segment from Notes field\n  const notes = member.Notes || '';\n  if (notes.includes('Segment:')) {\n    const segmentMatch = notes.match(/Segment:\\s*(\\w+)/);\n    if (segmentMatch && segmentMatch[1]) {\n      segment = segmentMatch[1];\n    }\n  }\n  \n  // If segment not found in Notes, determine from Role\n  if (!segment) {\n    const role = (member.Role || '').trim().toLowerCase();\n    \n    if (role.includes('ally')) {\n      segment = 'Ally';\n    } else if (role.includes('black queer man')) {\n      segment = 'BlackQueerMan';\n    } else if (role.includes('qtipoc organiser')) {\n      segment = 'QTIPOCOrganiser';\n    } else if (role.includes('organisation')) {\n      segment = 'Organisation';\n    } else {\n      segment = 'Other';\n    }\n  }\n  \n  return {\n    json: {\n      ...member,\n      firstName: member.FirstName || 'Community Member',\n      segment: segment,\n      campaign: 'BLKOUT NXT'\n    }\n  };\n});"
+      },
+      "name": "Filter for Survey Eligibility",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.segment }}",
+              "value2": "Ally"
+            }
+          ]
+        }
+      },
+      "name": "Route by Segment",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Your Ally Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for joining BLKOUT NXT as an Ally! We'd love to learn more about you and how you'd like to contribute to our community.\n\nPlease take a few minutes to complete our Ally survey:\nhttps://forms.gle/YLUvorjyU5FjXb7F6\n\nYour responses will help us tailor our communications and opportunities to your interests and availability.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Ally Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Your Community Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for joining the BLKOUT NXT community! We'd love to learn more about you and your interests.\n\nPlease take a few minutes to complete our community survey:\nhttps://forms.gle/9cg8G2oZi5V3HBHU6\n\nYour responses will help us tailor our events and resources to better serve you and the community.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send BQM Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organiser Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for joining BLKOUT NXT as a QTIPOC Organiser! We'd love to learn more about your work and how we can support your initiatives.\n\nPlease take a few minutes to complete our Organiser survey:\nhttps://forms.gle/t1GNMj7ZPV14eYhU9\n\nYour responses will help us better understand your needs and connect you with relevant resources and opportunities.\n\nIn the coming weeks, you'll receive a series of emails with valuable resources for QTIPOC organisers.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Organiser Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organisation Partnership Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for registering {{ $json.Organisation || 'your organisation' }} with BLKOUT NXT! We'd like to learn more about your organisation and potential collaboration opportunities.\n\nPlease take a few minutes to complete our Organisation survey:\nhttps://forms.gle/o3J4a3yhqfuSc6L58\n\nYour responses will help us identify the best ways to partner and support each other's missions.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Organisation Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Community Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for joining the BLKOUT NXT community! We'd love to learn more about you and your interests.\n\nPlease take a few minutes to complete our community survey:\nhttps://forms.gle/9cg8G2oZi5V3HBHU6\n\nYour responses will help us tailor our events and resources to better serve you and the community.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send General Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "OnboardingStatus",
+              "value": "Survey Sent"
+            },
+            {
+              "column": "LastEmailSent",
+              "value": "={{ $now.format(\"YYYY-MM-DD\") }}"
+            },
+            {
+              "column": "EmailHistory",
+              "value": "={{ ($json.EmailHistory ? $json.EmailHistory + \", Survey\" : \"Survey\") }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Member Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "days"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.segment === \"QTIPOCOrganiser\" }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Organiser?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Add member to Organiser drip campaign\nconst member = $input.item.json;\n\nconsole.log(`Adding ${member.Email} to Organiser drip campaign`);\n\n// Return with drip campaign info\nreturn {\n  json: {\n    ...member,\n    dripCampaign: \"Organiser\",\n    dripStage: 0,\n    nextDripDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 days from now\n  }\n};"
+      },
+      "name": "Add to Organiser Drip",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        800,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "Notes",
+              "value": "={{ ($json.Notes ? $json.Notes + \"; DripCampaign: Organiser; DripStage: 0; NextDripDate: \" + $json.nextDripDate : \"DripCampaign: Organiser; DripStage: 0; NextDripDate: \" + $json.nextDripDate) }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Drip Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1000,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Get Members for Survey": {
+      "main": [
+        [
+          {
+            "node": "Filter for Survey Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter for Survey Eligibility": {
+      "main": [
+        [
+          {
+            "node": "Route by Segment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Segment": {
+      "main": [
+        [
+          {
+            "node": "Send Ally Survey",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send BQM Survey",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Organiser Survey",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Organisation Survey",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send General Survey",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Ally Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send BQM Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Organiser Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Organisation Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send General Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Member Status": {
+      "main": [
+        [
+          {
+            "node": "Is Organiser?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Members for Survey",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Organiser?": {
+      "main": [
+        [
+          {
+            "node": "Add to Organiser Drip",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Add to Organiser Drip": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

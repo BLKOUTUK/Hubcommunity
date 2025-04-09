@@ -1,0 +1,239 @@
+{
+  "name": "Campaign Onboard 1 (Improved)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nocodb-sendfox-webhook",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.NOCODB_API_URL_COMMUNITYMEMBERS}}",
+        "authentication": "genericHeader",
+        "genericAuthenticationHeader": "xc-token",
+        "genericAuthenticationValue": "={{$env.NOCODB_API_TOKEN}}",
+        "options": {}
+      },
+      "name": "Get NocoDB Records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -800,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get the data from NocoDB\nconst nocodbData = $input.json.list || [];\n\n// Log the number of records\nconsole.log(`Processing ${nocodbData.length} records from NocoDB`);\n\n// Process each record\nreturn nocodbData.map(record => {\n  // Extract name parts if possible\n  let firstName = '';\n  let lastName = '';\n  \n  if (record.name) {\n    const nameParts = record.name.split(' ');\n    if (nameParts.length > 0) {\n      firstName = nameParts[0];\n      if (nameParts.length > 1) {\n        lastName = nameParts.slice(1).join(' ');\n      }\n    }\n  }\n  \n  return {\n    json: {\n      email: record.email,\n      first_name: firstName,\n      last_name: lastName,\n      userType: record.userType || '',\n      organisation: record.organisation || '',\n      // Include the original record ID for reference\n      recordId: record.id || ''\n    }\n  };\n});"
+      },
+      "name": "Process Records",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.sendfox.com/contacts",
+        "authentication": "genericHeader",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer ={{$env.SENDFOX_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{$json.email}}"
+            },
+            {
+              "name": "first_name",
+              "value": "={{$json.first_name}}"
+            },
+            {
+              "name": "last_name",
+              "value": "={{$json.last_name}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Send to SendFox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -400,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json?.statusCode }}",
+              "operation": "equal",
+              "value2": 200
+            }
+          ]
+        }
+      },
+      "name": "Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log the successful contact addition\nconst email = $input.json.email || 'unknown';\nconst recordId = $input.json.recordId || 'unknown';\n\nconsole.log(`Successfully added contact to SendFox: ${email} (Record ID: ${recordId})`);\n\n// Return the success data\nreturn {\n  json: {\n    success: true,\n    message: \"Contact added to SendFox successfully\",\n    email: email,\n    recordId: recordId,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Log Success",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log the error\nconst email = $input.json.email || 'unknown';\nconst recordId = $input.json.recordId || 'unknown';\nconst errorMessage = $input.json.error || $input.json.message || 'Unknown error';\nconst statusCode = $input.json.statusCode || 'unknown';\n\nconsole.log(`Failed to add contact to SendFox: ${email} (Record ID: ${recordId}). Error: ${errorMessage}, Status: ${statusCode}`);\n\n// Return the error data\nreturn {\n  json: {\n    success: false,\n    message: \"Failed to add contact to SendFox\",\n    email: email,\n    recordId: recordId,\n    error: errorMessage,\n    statusCode: statusCode,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Log Error",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get NocoDB Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get NocoDB Records": {
+      "main": [
+        [
+          {
+            "node": "Process Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Records": {
+      "main": [
+        [
+          {
+            "node": "Send to SendFox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to SendFox": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

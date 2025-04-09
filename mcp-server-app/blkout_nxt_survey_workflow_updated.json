@@ -1,0 +1,657 @@
+{
+  "name": "BLKOUT NXT Survey Follow-up (Updated)",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Members for Survey",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filter for members who need survey emails or reminders\nconst members = $input.all()[0].json;\nconst now = new Date();\n\n// Two types of members we're looking for:\n// 1. Those who received welcome email 6+ hours ago but haven't received survey email\n// 2. Those who received survey email 3+ days ago but haven't completed survey\n\nconst eligibleMembers = members.filter(member => {\n  const status = member.OnboardingStatus || '';\n  const emailHistory = member.EmailHistory || '';\n  const lastEmailDate = member.LastEmailSent || '';\n  \n  // Skip if no email or last email date\n  if (!member.Email || !lastEmailDate) return false;\n  \n  // Parse the last email date\n  const lastEmailTime = new Date(lastEmailDate).getTime();\n  const currentTime = now.getTime();\n  \n  // Calculate hours since last email\n  const hoursSinceLastEmail = Math.floor((currentTime - lastEmailTime) / (1000 * 60 * 60));\n  \n  // Calculate days since last email\n  const daysSinceLastEmail = Math.floor(hoursSinceLastEmail / 24);\n  \n  // Case 1: Received welcome email 6+ hours ago but not survey email\n  const receivedWelcome = status === 'Welcome Sent' || emailHistory.includes('Welcome');\n  const receivedSurvey = emailHistory.includes('Survey');\n  const readyForSurvey = receivedWelcome && !receivedSurvey && hoursSinceLastEmail >= 6;\n  \n  // Case 2: Received survey email 3+ days ago but no survey completion\n  const surveyNotCompleted = status === 'Survey Sent' && !status.includes('Completed');\n  const needsReminder = surveyNotCompleted && daysSinceLastEmail >= 3 && !emailHistory.includes('Reminder');\n  \n  return readyForSurvey || needsReminder;\n});\n\nconsole.log(`Found ${eligibleMembers.length} members for survey emails or reminders`);\n\n// Determine segment and email type for each eligible member\nreturn eligibleMembers.map(member => {\n  // Extract segment from Notes field or determine from Role\n  let segment = '';\n  \n  // First try to get segment from Notes field\n  const notes = member.Notes || '';\n  if (notes.includes('Segment:')) {\n    const segmentMatch = notes.match(/Segment:\\s*(\\w+)/);\n    if (segmentMatch && segmentMatch[1]) {\n      segment = segmentMatch[1];\n    }\n  }\n  \n  // If segment not found in Notes, determine from Role\n  if (!segment) {\n    const role = (member.Role || '').trim().toLowerCase();\n    \n    if (role.includes('ally')) {\n      segment = 'Ally';\n    } else if (role.includes('black queer man')) {\n      segment = 'BlackQueerMan';\n    } else if (role.includes('qtipoc organiser')) {\n      segment = 'QTIPOCOrganiser';\n    } else if (role.includes('organisation')) {\n      segment = 'Organisation';\n    } else {\n      segment = 'Other';\n    }\n  }\n  \n  // Determine if this is a reminder\n  const emailHistory = member.EmailHistory || '';\n  const isReminder = emailHistory.includes('Survey');\n  \n  return {\n    json: {\n      ...member,\n      firstName: member.FirstName || 'Community Member',\n      segment: segment,\n      campaign: 'BLKOUT NXT',\n      isReminder: isReminder\n    }\n  };\n});"
+      },
+      "name": "Filter for Survey Eligibility",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isReminder }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Reminder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.segment }}",
+              "value2": "Ally"
+            }
+          ]
+        }
+      },
+      "name": "Route by Segment (Initial)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.segment }}",
+              "value2": "Ally"
+            }
+          ]
+        }
+      },
+      "name": "Route by Segment (Reminder)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Your Ally Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for joining BLKOUT NXT as an Ally! We'd love to learn more about you and how you'd like to contribute to our community.\n\nPlease take a few minutes to complete our Ally survey:\nhttps://forms.gle/YLUvorjyU5FjXb7F6\n\nYour responses will help us tailor our communications and opportunities to your interests and availability.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Ally Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Your Community Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for joining the BLKOUT NXT community! We'd love to learn more about you and your interests.\n\nPlease take a few minutes to complete our community survey:\nhttps://forms.gle/9cg8G2oZi5V3HBHU6\n\nYour responses will help us tailor our events and resources to better serve you and the community.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send BQM Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organiser Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for joining BLKOUT NXT as a QTIPOC Organiser! We'd love to learn more about your work and how we can support your initiatives.\n\nPlease take a few minutes to complete our Organiser survey:\nhttps://forms.gle/t1GNMj7ZPV14eYhU9\n\nYour responses will help us better understand your needs and connect you with relevant resources and opportunities.\n\nIn the coming weeks, you'll receive a series of emails with valuable resources for QTIPOC organisers.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Organiser Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organisation Partnership Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for registering {{ $json.Organisation || 'your organisation' }} with BLKOUT NXT! We'd like to learn more about your organisation and potential collaboration opportunities.\n\nPlease take a few minutes to complete our Organisation survey:\nhttps://forms.gle/o3J4a3yhqfuSc6L58\n\nYour responses will help us identify the best ways to partner and support each other's missions.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Organisation Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Community Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for joining the BLKOUT NXT community! We'd love to learn more about you and your interests.\n\nPlease take a few minutes to complete our community survey:\nhttps://forms.gle/9cg8G2oZi5V3HBHU6\n\nYour responses will help us tailor our events and resources to better serve you and the community.\n\nIf you have any questions, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send General Survey",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Reminder: BLKOUT NXT - Your Ally Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nWe noticed you haven't completed the BLKOUT NXT Ally survey yet. Your input is valuable to us and will help us tailor our communications and opportunities to your interests.\n\nThe survey only takes a few minutes to complete:\nhttps://forms.gle/YLUvorjyU5FjXb7F6\n\nIf you've already completed the survey, thank you! You can disregard this reminder.\n\nIf you have any questions or need assistance, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Ally Reminder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Reminder: BLKOUT NXT - Your Community Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nWe noticed you haven't completed the BLKOUT NXT community survey yet. Your input is valuable to us and will help us tailor our events and resources to better serve you.\n\nThe survey only takes a few minutes to complete:\nhttps://forms.gle/9cg8G2oZi5V3HBHU6\n\nIf you've already completed the survey, thank you! You can disregard this reminder.\n\nIf you have any questions or need assistance, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send BQM Reminder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Reminder: BLKOUT NXT - Organiser Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nWe noticed you haven't completed the BLKOUT NXT Organiser survey yet. Your input is valuable to us and will help us better understand your needs and connect you with relevant resources.\n\nThe survey only takes a few minutes to complete:\nhttps://forms.gle/t1GNMj7ZPV14eYhU9\n\nIf you've already completed the survey, thank you! You can disregard this reminder.\n\nIf you have any questions or need assistance, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Organiser Reminder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Reminder: BLKOUT NXT - Organisation Partnership Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nWe noticed you haven't completed the BLKOUT NXT Organisation Partnership survey yet. Your input is valuable to us and will help us identify the best ways to partner with {{ $json.Organisation || 'your organisation' }}.\n\nThe survey only takes a few minutes to complete:\nhttps://forms.gle/o3J4a3yhqfuSc6L58\n\nIf you've already completed the survey, thank you! You can disregard this reminder.\n\nIf you have any questions or need assistance, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Organisation Reminder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Reminder: BLKOUT NXT - Community Survey",
+        "text": "=Dear {{ $json.firstName }},\n\nWe noticed you haven't completed the BLKOUT NXT community survey yet. Your input is valuable to us and will help us tailor our events and resources to better serve you.\n\nThe survey only takes a few minutes to complete:\nhttps://forms.gle/9cg8G2oZi5V3HBHU6\n\nIf you've already completed the survey, thank you! You can disregard this reminder.\n\nIf you have any questions or need assistance, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send General Reminder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        400,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "OnboardingStatus",
+              "value": "Survey Sent"
+            },
+            {
+              "column": "LastEmailSent",
+              "value": "={{ $now.format(\"YYYY-MM-DD\") }}"
+            },
+            {
+              "column": "EmailHistory",
+              "value": "={{ ($json.EmailHistory ? $json.EmailHistory + \", Survey\" : \"Survey\") }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Member Status (Initial)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        600,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "LastEmailSent",
+              "value": "={{ $now.format(\"YYYY-MM-DD\") }}"
+            },
+            {
+              "column": "EmailHistory",
+              "value": "={{ ($json.EmailHistory ? $json.EmailHistory + \", Survey Reminder\" : \"Survey Reminder\") }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Member Status (Reminder)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        600,
+        700
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "hours"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.Email !== undefined && $json.Email !== \"\" }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Has Valid Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log error for members without email\nconst member = $input.item.json;\n\nconsole.log(`Error: Member without valid email address. Data: ${JSON.stringify(member)}`);\n\nreturn $input.item;"
+      },
+      "name": "Log Error",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ]
+    }
+  ],
+  "connections": {
+    "Get Members for Survey": {
+      "main": [
+        [
+          {
+            "node": "Filter for Survey Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter for Survey Eligibility": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Reminder?": {
+      "main": [
+        [
+          {
+            "node": "Route by Segment (Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route by Segment (Initial)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Segment (Initial)": {
+      "main": [
+        [
+          {
+            "node": "Send Ally Survey",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send BQM Survey",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Organiser Survey",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Organisation Survey",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send General Survey",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Segment (Reminder)": {
+      "main": [
+        [
+          {
+            "node": "Send Ally Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send BQM Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Organiser Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Organisation Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send General Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Ally Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Initial)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send BQM Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Initial)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Organiser Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Initial)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Organisation Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Initial)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send General Survey": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Initial)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Ally Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send BQM Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Organiser Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Organisation Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send General Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status (Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Members for Survey",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Email?": {
+      "main": [
+        [
+          {
+            "node": "Is Reminder?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

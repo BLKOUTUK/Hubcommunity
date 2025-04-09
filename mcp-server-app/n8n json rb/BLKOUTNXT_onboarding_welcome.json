@@ -1,0 +1,140 @@
+{
+  "name": "BLKOUT NXT Onboarding (Fixed)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "blkout-nxt-onboarding",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Welcome",
+        "range": "A:J",
+        "options": {}
+      },
+      "name": "Get New Members",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter new members code\nconst items = $input.all();\nconst filteredItems = [];\n\nfor (const item of items) {\n  try {\n    const row = item.json;\n    if (!row || !row.Email || !row.Status) continue;\n    \n    if (row.Status === \"Active\" && (!row.OnboardingStatus || row.OnboardingStatus !== \"Welcomed\")) {\n      if (row.MemberType) {\n        const memberType = row.MemberType.toLowerCase();\n        if (memberType.includes('ally')) {\n          row.Segment = 'Ally';\n        } else if (memberType.includes('black queer men') || memberType.includes('bqm')) {\n          row.Segment = 'BlackQueerMen';\n        } else if (memberType.includes('qtipoc') || memberType.includes('organiser')) {\n          row.Segment = 'QTIPOCOrganiser';\n        } else if (memberType.includes('organisation')) {\n          row.Segment = 'Organisation';\n        } else {\n          row.Segment = 'General';\n        }\n      } else {\n        row.Segment = 'General';\n      }\n      filteredItems.push(item);\n    }\n  } catch (error) {\n    console.error('Error processing row:', error);\n  }\n}\nreturn filteredItems;"
+      },
+      "name": "Filter and Segment Members",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkoutuk.com",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Welcome to BLKOUT NXT",
+        "text": "Hi {{ $json.Name }},\n\nWelcome to the BLKOUT NXT community! We're thrilled to have you join us.\n\nBest regards,\nThe BLKOUT NXT Team"
+      },
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Welcome",
+        "range": "={{ \"J\" + ($json.row_number) }}",
+        "options": {},
+        "values": {
+          "values": [
+            [
+              "Welcomed"
+            ]
+          ]
+        }
+      },
+      "name": "Update Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get New Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get New Members": {
+      "main": [
+        [
+          {
+            "node": "Filter and Segment Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter and Segment Members": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "tags": [
+    {
+      "name": "BLKOUT NXT",
+      "color": "#ff0000"
+    }
+  ],
+  "versionId": "1"
+}

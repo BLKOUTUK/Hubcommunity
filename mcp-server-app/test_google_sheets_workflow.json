@@ -1,0 +1,59 @@
+{
+  "name": "Test Google Sheets Connection",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log the input data structure\nconst inputData = $input.all();\nconsole.log(\"Input data type:\", typeof inputData);\nconsole.log(\"Input data is array:\", Array.isArray(inputData));\nconsole.log(\"Input data length:\", inputData ? inputData.length : 0);\n\n// Try to extract the first item\nif (Array.isArray(inputData) && inputData.length > 0) {\n  console.log(\"First item type:\", typeof inputData[0]);\n  console.log(\"First item has json property:\", inputData[0].hasOwnProperty('json'));\n  \n  if (inputData[0].json) {\n    console.log(\"json property type:\", typeof inputData[0].json);\n    console.log(\"json is array:\", Array.isArray(inputData[0].json));\n    console.log(\"json length:\", Array.isArray(inputData[0].json) ? inputData[0].json.length : 'N/A');\n    \n    // Log the first few items if it's an array\n    if (Array.isArray(inputData[0].json) && inputData[0].json.length > 0) {\n      console.log(\"First 3 items in json array:\", inputData[0].json.slice(0, 3));\n    }\n  }\n}\n\n// Return the data unchanged\nreturn $input.item;"
+      },
+      "name": "Debug Data Structure",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Debug Data Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

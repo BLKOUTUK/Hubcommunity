@@ -1,0 +1,445 @@
+{
+  "name": "BLKOUT NXT Survey Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 6,
+              "unit": "hours"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "={{ $json.surveyResponsesSheetId }}",
+        "sheetName": "Form Responses 1",
+        "range": "A:Z",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Ally Survey Responses",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -600,
+        100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "={{ $json.surveyResponsesSheetId }}",
+        "sheetName": "Form Responses 1",
+        "range": "A:Z",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get BQM Survey Responses",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -600,
+        240
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "={{ $json.surveyResponsesSheetId }}",
+        "sheetName": "Form Responses 1",
+        "range": "A:Z",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Organiser Survey Responses",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -600,
+        380
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "={{ $json.surveyResponsesSheetId }}",
+        "sheetName": "Form Responses 1",
+        "range": "A:Z",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Organisation Survey Responses",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -600,
+        520
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Set the survey sheet IDs\nreturn [\n  {\n    json: {\n      surveyType: \"Ally\",\n      surveyResponsesSheetId: \"YLUvorjyU5FjXb7F6\", // Replace with actual Sheet ID for Ally survey\n      processedFlag: \"AllyProcessed\"\n    }\n  },\n  {\n    json: {\n      surveyType: \"BlackQueerMan\",\n      surveyResponsesSheetId: \"9cg8G2oZi5V3HBHU6\", // Replace with actual Sheet ID for BQM survey\n      processedFlag: \"BQMProcessed\"\n    }\n  },\n  {\n    json: {\n      surveyType: \"QTIPOCOrganiser\",\n      surveyResponsesSheetId: \"t1GNMj7ZPV14eYhU9\", // Replace with actual Sheet ID for Organiser survey\n      processedFlag: \"OrganiserProcessed\"\n    }\n  },\n  {\n    json: {\n      surveyType: \"Organisation\",\n      surveyResponsesSheetId: \"o3J4a3yhqfuSc6L58\", // Replace with actual Sheet ID for Organisation survey\n      processedFlag: \"OrganisationProcessed\"\n    }\n  }\n];"
+      },
+      "name": "Set Survey IDs",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process survey responses\nconst responses = $input.all()[0].json;\nconst surveyType = $input.item.json.surveyType;\nconst processedFlag = $input.item.json.processedFlag;\n\n// Filter for unprocessed responses\nconst unprocessedResponses = responses.filter(response => {\n  // Check if this response has been processed before\n  return !response[processedFlag] || response[processedFlag] !== 'true';\n});\n\nconsole.log(`Found ${unprocessedResponses.length} unprocessed ${surveyType} survey responses`);\n\n// Map the responses to our database format\nreturn unprocessedResponses.map(response => {\n  // Extract email (assuming it's in a field called 'Email' or 'email')\n  const email = response.Email || response.email || '';\n  \n  // Create a JSON string of all survey responses\n  const surveyData = {};\n  Object.keys(response).forEach(key => {\n    // Skip metadata fields\n    if (key !== 'Timestamp' && key !== processedFlag) {\n      surveyData[key] = response[key];\n    }\n  });\n  \n  return {\n    json: {\n      email: email,\n      surveyType: surveyType,\n      surveyData: JSON.stringify(surveyData),\n      responseTimestamp: response.Timestamp || new Date().toISOString(),\n      rowIndex: response.rowIndex || 0,\n      processedFlag: processedFlag\n    }\n  };\n});"
+      },
+      "name": "Process Survey Responses",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Community Members",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Match survey responses with community members\nconst members = $node[\"Get Community Members\"].json;\nconst surveyResponse = $input.item.json;\n\n// Find the matching member by email\nconst matchingMember = members.find(member => {\n  return member.Email && member.Email.toLowerCase() === surveyResponse.email.toLowerCase();\n});\n\nif (!matchingMember) {\n  console.log(`No matching member found for email: ${surveyResponse.email}`);\n  return {\n    json: {\n      ...surveyResponse,\n      memberFound: false\n    }\n  };\n}\n\n// Update the member record with survey data\nconst updatedMember = {\n  ...matchingMember,\n  OnboardingStatus: 'Survey Completed',\n  SurveyData: surveyResponse.surveyData,\n  SurveyTimestamp: surveyResponse.responseTimestamp,\n  Notes: matchingMember.Notes ? \n    `${matchingMember.Notes}; ${surveyResponse.surveyType} Survey Completed: ${surveyResponse.responseTimestamp}` : \n    `${surveyResponse.surveyType} Survey Completed: ${surveyResponse.responseTimestamp}`\n};\n\nreturn {\n  json: {\n    ...surveyResponse,\n    memberFound: true,\n    memberData: updatedMember\n  }\n};"
+      },
+      "name": "Match with Member",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.memberFound }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Member Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "autoMapInputData"
+      },
+      "name": "Update Member Record",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        400,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "={{ $json.surveyResponsesSheetId }}",
+        "sheetName": "Form Responses 1",
+        "range": "A:Z",
+        "keyRow": "rowIndex",
+        "keyValue": "={{ $json.rowIndex }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "={{ $json.processedFlag }}",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "name": "Mark Survey as Processed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        600,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log that no matching member was found\nconsole.log(`No matching member found for survey response from ${$input.item.json.email}. Survey type: ${$input.item.json.surveyType}`);\n\n// Return the original data\nreturn $input.item;"
+      },
+      "name": "Log No Match",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        400,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Survey IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Ally Survey Responses": {
+      "main": [
+        [
+          {
+            "node": "Process Survey Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get BQM Survey Responses": {
+      "main": [
+        [
+          {
+            "node": "Process Survey Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Organiser Survey Responses": {
+      "main": [
+        [
+          {
+            "node": "Process Survey Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Organisation Survey Responses": {
+      "main": [
+        [
+          {
+            "node": "Process Survey Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Survey IDs": {
+      "main": [
+        [
+          {
+            "node": "Get Ally Survey Responses",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get BQM Survey Responses",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Organiser Survey Responses",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Organisation Survey Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Survey Responses": {
+      "main": [
+        [
+          {
+            "node": "Get Community Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Community Members": {
+      "main": [
+        [
+          {
+            "node": "Match with Member",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match with Member": {
+      "main": [
+        [
+          {
+            "node": "Member Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Member Found?": {
+      "main": [
+        [
+          {
+            "node": "Update Member Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log No Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Member Record": {
+      "main": [
+        [
+          {
+            "node": "Mark Survey as Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log No Match": {
+      "main": [
+        [
+          {
+            "node": "Mark Survey as Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

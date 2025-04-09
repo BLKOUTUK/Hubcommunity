@@ -1,0 +1,65 @@
+{
+  "mcpServers": {
+      "blkout-campaign": {
+          "command": "python",
+          "args": [
+              "C:/Users/robbe/hub_community/Hubcommunity/mcp-server-app/mcp-server/campaign-server/campaign_server.py"
+          ]
+      },
+      "sendfox-integration": {
+          "command": "python",
+          "args": [
+              "C:/Users/robbe/hub_community/Hubcommunity/mcp-server-app/mcp-server/integration-server/sendfox/sendfox_server.py"
+          ]
+      },
+      "heartbeat-integration": {
+          "command": "python",
+          "args": [
+              "C:/Users/robbe/hub_community/Hubcommunity/mcp-server-app/mcp-server/integration-server/heartbeat/heartbeat_server.py"
+          ]
+      },
+      "social-media-integration": {
+          "command": "python",
+          "args": [
+              "C:/Users/robbe/hub_community/Hubcommunity/mcp-server-app/mcp-server/integration-server/social-media/social_server.py"
+          ]
+      },
+      "weather": {
+          "command": "python",
+          "args": [
+              "C:/Users/robbe/hub_community/Hubcommunity/mcp-server-app/mcp-server/weather_server.py"
+          ]
+      },
+      "file-system": {
+          "command": "python",
+          "args": [
+              "C:/Users/robbe/hub_community/Hubcommunity/mcp-server-app/mcp-server/file_server.py"
+          ]
+      }
+  },
+  "tools": {
+      "fetch": {
+          "command": "npx",
+          "args": ["-y", "@kazuph/mcp-fetch"]
+      },
+      "n8n-workflow-builder": {
+          "command": "node",
+          "args": ["/root/n8n-workflow-builder/build/index.js"],
+          "env": {
+              "N8N_HOST": "http://localhost:5678/api/v1",
+              "N8N_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2MzZjNTEyZC1lYmM3LTRiYzYtYWM5MS0zMzI3ZDgzY2UwMjMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQzNzg1NTY0LCJleHAiOjE3NTE1MTUyMDB9.ZWbR5bp1jtaB7yfxn-kg4ASNHgXuRIe5QKv5O9ccUJI"
+          },
+          "disabled": false,
+          "alwaysAllow": [
+              "create_workflow",
+              "create_workflow_and_activate",
+              "update_workflow",
+              "activate_workflow",
+              "deactivate_workflow",
+              "get_workflow",
+              "delete_workflow"
+          ],
+          "autoApprove": []
+      }
+  }
+}

@@ -1,0 +1,16 @@
+{
+    "mcpServers": {
+        "weather": {
+            "command": "python",
+            "args": [
+                "c:/Users/robbe/hub_community/hub_community/mcp-server-app/mcp-server/weather_server.py"
+            ]
+        },
+        "file-system": {
+            "command": "python",
+            "args": [
+                "c:/Users/robbe/hub_community/hub_community/mcp-server-app/mcp-server/file_server.py"
+            ]
+        }
+    }
+}

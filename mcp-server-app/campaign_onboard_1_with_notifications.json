@@ -1,0 +1,527 @@
+{
+  "name": "Campaign Onboard 1 (With Notifications)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nocodb-sendfox-webhook",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.NOCODB_API_URL_COMMUNITYMEMBERS}}",
+        "authentication": "genericHeader",
+        "genericAuthenticationHeader": "xc-token",
+        "genericAuthenticationValue": "={{$env.NOCODB_API_TOKEN}}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Get NocoDB Records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -800,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get the data from NocoDB\nlet nocodbData = [];\n\n// Handle different response formats from NocoDB\nif ($input.json.list) {\n  // v2 API format\n  nocodbData = $input.json.list;\n} else if (Array.isArray($input.json)) {\n  // Direct array format\n  nocodbData = $input.json;\n} else if ($input.json.data && Array.isArray($input.json.data)) {\n  // Another possible format\n  nocodbData = $input.json.data;\n} else {\n  // Log error if we can't find the data\n  console.log('Error: Could not find records in NocoDB response');\n  console.log('Response:', JSON.stringify($input.json));\n  nocodbData = [];\n}\n\n// Log the number of records\nconsole.log(`Processing ${nocodbData.length} records from NocoDB`);\n\n// Process each record\nreturn nocodbData.map(record => {\n  // Extract name parts if possible\n  let firstName = '';\n  let lastName = '';\n  \n  if (record.name) {\n    const nameParts = record.name.split(' ');\n    if (nameParts.length > 0) {\n      firstName = nameParts[0];\n      if (nameParts.length > 1) {\n        lastName = nameParts.slice(1).join(' ');\n      }\n    }\n  }\n  \n  // Get list IDs if available\n  let listIds = [];\n  if (record.listIds && Array.isArray(record.listIds)) {\n    listIds = record.listIds;\n  } else if (record.listId) {\n    listIds = [record.listId];\n  }\n  \n  return {\n    json: {\n      email: record.email,\n      first_name: firstName,\n      last_name: lastName,\n      userType: record.userType || '',\n      organisation: record.organisation || '',\n      // Include the original record ID for reference\n      recordId: record.id || '',\n      // Include list IDs if available\n      listIds: listIds\n    }\n  };\n});"
+      },
+      "name": "Process Records",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.sendfox.com/contacts",
+        "authentication": "genericHeader",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer ={{$env.SENDFOX_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{$json.email}}"
+            },
+            {
+              "name": "first_name",
+              "value": "={{$json.first_name}}"
+            },
+            {
+              "name": "last_name",
+              "value": "={{$json.last_name}}"
+            },
+            {
+              "name": "lists[]",
+              "value": "572573"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          },
+          "timeout": 15000,
+          "allowUnauthorizedCerts": false,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "name": "Send to SendFox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -400,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json?.statusCode }}",
+              "operation": "equal",
+              "value2": 200
+            }
+          ]
+        }
+      },
+      "name": "Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log the successful contact addition\nconst email = $input.json.email || 'unknown';\nconst recordId = $input.json.recordId || 'unknown';\nconst responseData = $input.json.data || {};\n\nconsole.log(`Successfully added contact to SendFox: ${email} (Record ID: ${recordId})`);\n\n// Return the success data\nreturn {\n  json: {\n    success: true,\n    message: \"Contact added to SendFox successfully\",\n    email: email,\n    recordId: recordId,\n    sendfoxId: responseData.id || null,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Log Success",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check if this is a 409 Conflict (contact already exists)\nconst statusCode = $input.json.statusCode || 0;\nconst email = $input.json.email || 'unknown';\nconst recordId = $input.json.recordId || 'unknown';\nlet errorMessage = '';\n\n// Try to extract error message from response\nif ($input.json.data && $input.json.data.message) {\n  errorMessage = $input.json.data.message;\n} else if ($input.json.error) {\n  errorMessage = $input.json.error;\n} else if ($input.json.message) {\n  errorMessage = $input.json.message;\n} else {\n  errorMessage = 'Unknown error';\n}\n\n// Check if this is a \"contact already exists\" error\nconst isAlreadyExists = statusCode === 409 || \n                       errorMessage.includes('already exists') || \n                       errorMessage.includes('already subscribed');\n\nif (isAlreadyExists) {\n  console.log(`Contact already exists in SendFox: ${email} (Record ID: ${recordId})`);\n  \n  // Return as a \"soft success\"\n  return {\n    json: {\n      success: true,\n      message: \"Contact already exists in SendFox\",\n      email: email,\n      recordId: recordId,\n      alreadyExists: true,\n      timestamp: new Date().toISOString()\n    }\n  };\n} else {\n  // This is a real error\n  console.log(`Failed to add contact to SendFox: ${email} (Record ID: ${recordId}). Error: ${errorMessage}, Status: ${statusCode}`);\n  \n  // Return the error data\n  return {\n    json: {\n      success: false,\n      message: \"Failed to add contact to SendFox\",\n      email: email,\n      recordId: recordId,\n      error: errorMessage,\n      statusCode: statusCode,\n      timestamp: new Date().toISOString(),\n      // Add notification flag\n      sendNotification: true\n    }\n  };\n}"
+      },
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.success }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check if we should retry\nconst statusCode = $input.json.statusCode || 0;\nconst retryableStatusCodes = [408, 429, 500, 502, 503, 504];\nconst shouldRetry = retryableStatusCodes.includes(statusCode);\n\n// Get retry count from workflow data or initialize to 0\nconst retryCount = $input.json.retryCount || 0;\nconst maxRetries = 3;\n\nif (shouldRetry && retryCount < maxRetries) {\n  // Increment retry count\n  const newRetryCount = retryCount + 1;\n  \n  // Calculate exponential backoff delay (in milliseconds)\n  // 1st retry: 2 seconds, 2nd retry: 4 seconds, 3rd retry: 8 seconds\n  const delayMs = Math.pow(2, newRetryCount) * 1000;\n  \n  console.log(`Retrying SendFox API call for ${$input.json.email} (Attempt ${newRetryCount} of ${maxRetries}). Waiting ${delayMs/1000} seconds...`);\n  \n  // Add retry count to the data\n  return {\n    json: {\n      ...$input.json,\n      retryCount: newRetryCount,\n      retryAfter: delayMs\n    }\n  };\n} else {\n  // We've exhausted retries or this error is not retryable\n  if (retryCount >= maxRetries) {\n    console.log(`Maximum retry attempts (${maxRetries}) reached for ${$input.json.email}. Giving up.`);\n  } else if (!shouldRetry) {\n    console.log(`Error code ${statusCode} is not retryable for ${$input.json.email}.`);\n  }\n  \n  // Pass through the original error\n  return $input;\n}"
+      },
+      "name": "Should Retry?",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.retryCount }}",
+              "operation": "exists"
+            }
+          ]
+        }
+      },
+      "name": "Has Retry Count?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.retryAfter }}",
+        "unit": "milliseconds"
+      },
+      "name": "Wait Before Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        800,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        800,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.sendfox.com/contacts",
+        "authentication": "genericHeader",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer ={{$env.SENDFOX_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{$json.email}}"
+            },
+            {
+              "name": "first_name",
+              "value": "={{$json.first_name}}"
+            },
+            {
+              "name": "last_name",
+              "value": "={{$json.last_name}}"
+            },
+            {
+              "name": "lists[]",
+              "value": "572573"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          },
+          "timeout": 15000,
+          "allowUnauthorizedCerts": false,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "name": "Retry SendFox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1000,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.sendNotification }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Should Send Notification?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notifications@hubcommunity.org",
+        "toEmail": "blkoutuk@gmail.com",
+        "subject": "SendFox Integration Error - Hub Community",
+        "text": "=Error occurred in the SendFox integration workflow.\n\nDetails:\n- Email: {{ $json.email }}\n- Record ID: {{ $json.recordId }}\n- Error: {{ $json.error }}\n- Status Code: {{ $json.statusCode }}\n- Timestamp: {{ $json.timestamp }}\n\nPlease check the n8n logs for more details.\n\nThis is an automated notification from the Hub Community system.",
+        "options": {}
+      },
+      "name": "Send Error Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        600,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get NocoDB Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get NocoDB Records": {
+      "main": [
+        [
+          {
+            "node": "Process Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Records": {
+      "main": [
+        [
+          {
+            "node": "Send to SendFox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to SendFox": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Error": {
+      "main": [
+        [
+          {
+            "node": "Is Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Success?": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Should Retry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Retry?": {
+      "main": [
+        [
+          {
+            "node": "Has Retry Count?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Should Send Notification?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Retry Count?": {
+      "main": [
+        [
+          {
+            "node": "Wait Before Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Retry": {
+      "main": [
+        [
+          {
+            "node": "Retry SendFox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry SendFox": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Send Notification?": {
+      "main": [
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send Error Email": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

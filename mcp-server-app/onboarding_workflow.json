@@ -1,0 +1,252 @@
+{
+  "name": "BLKOUT Hub Onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get New Members",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filter for members who haven't received a welcome email yet\nconst members = $input.all()[0].json;\n\n// Filter for members with OnboardingStatus empty or 'New'\nconst newMembers = members.filter(member => {\n  const status = member.OnboardingStatus || '';\n  return status === '' || status === 'New';\n});\n\nconsole.log(`Found ${newMembers.length} new members to onboard`);\n\n// Return the filtered members\nreturn newMembers.map(member => {\n  return {\n    json: {\n      ...member,\n      // Add any additional processing here\n      firstName: member.FirstName || 'Community Member',\n      joinDate: member.JoinDate || new Date().toISOString().split('T')[0]\n    }\n  };\n});"
+      },
+      "name": "Filter New Members",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notifications@hubcommunity.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Welcome to BLKOUT Hub Community!",
+        "text": "=Dear {{ $json.FirstName }},\n\nWelcome to BLKOUT Hub! We're thrilled to have you join our community.\n\nAs a member of BLKOUT Hub, you'll have access to:\n- Community events and workshops\n- Networking opportunities\n- Resources and support\n\nIn the coming days, we'll send you a short survey to better understand your interests and how we can best support you.\n\nIf you have any questions in the meantime, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT Hub Team",
+        "options": {}
+      },
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "OnboardingStatus",
+              "value": "Welcome Sent"
+            },
+            {
+              "column": "LastEmailSent",
+              "value": "={{ $now.format(\"YYYY-MM-DD\") }}"
+            },
+            {
+              "column": "EmailHistory",
+              "value": "={{ ($json.EmailHistory ? $json.EmailHistory + \", Welcome\" : \"Welcome\") }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Member Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "hours"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.Email !== undefined && $json.Email !== \"\" }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Has Valid Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log error for members without email\nconst member = $input.item.json;\n\nconsole.log(`Error: Member without valid email address. Data: ${JSON.stringify(member)}`);\n\nreturn $input.item;"
+      },
+      "name": "Log Error",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.OnboardingStatus }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Check Status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Get New Members": {
+      "main": [
+        [
+          {
+            "node": "Filter New Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Members": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get New Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Email?": {
+      "main": [
+        [
+          {
+            "node": "Check Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

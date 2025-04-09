@@ -1,0 +1,59 @@
+{
+  "name": "Test Google Sheets Connection (Code Node)",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log the input data structure\nconst items = $input.all();\nconsole.log(\"Input items type:\", typeof items);\nconsole.log(\"Input items is array:\", Array.isArray(items));\nconsole.log(\"Input items length:\", items ? items.length : 0);\n\n// Try to extract the first item\nif (Array.isArray(items) && items.length > 0) {\n  console.log(\"First item type:\", typeof items[0]);\n  console.log(\"First item has json property:\", items[0].hasOwnProperty('json'));\n  \n  if (items[0].json) {\n    console.log(\"json property type:\", typeof items[0].json);\n    console.log(\"json is array:\", Array.isArray(items[0].json));\n    console.log(\"json length:\", Array.isArray(items[0].json) ? items[0].json.length : 'N/A');\n    \n    // Log the first few items if it's an array\n    if (Array.isArray(items[0].json) && items[0].json.length > 0) {\n      console.log(\"First item in json array:\", JSON.stringify(items[0].json[0], null, 2));\n      \n      // Check if the first item has the expected properties\n      const firstItem = items[0].json[0];\n      if (firstItem) {\n        console.log(\"First item has Email property:\", firstItem.hasOwnProperty('Email'));\n        console.log(\"First item has FirstName property:\", firstItem.hasOwnProperty('FirstName'));\n        console.log(\"First item has Role property:\", firstItem.hasOwnProperty('Role'));\n        console.log(\"First item has OnboardingStatus property:\", firstItem.hasOwnProperty('OnboardingStatus'));\n      }\n    }\n  }\n}\n\n// Return the data unchanged\nreturn $input.all();"
+      },
+      "name": "Debug Data Structure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Debug Data Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,339 @@
+{
+  "name": "BLKOUT NXT Organiser Drip Campaign",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Organisers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filter for organisers in the drip campaign\nconst members = $input.all()[0].json;\nconst today = new Date().toISOString().split('T')[0];\n\n// Filter for members in the Organiser drip campaign who are due for next email\nconst eligibleOrganisers = members.filter(member => {\n  const notes = member.Notes || '';\n  \n  // Check if they're in the Organiser drip campaign\n  const inDripCampaign = notes.includes('DripCampaign: Organiser');\n  \n  // Extract drip stage\n  let dripStage = -1;\n  if (inDripCampaign) {\n    const stageMatch = notes.match(/DripStage:\\s*(\\d+)/);\n    if (stageMatch && stageMatch[1]) {\n      dripStage = parseInt(stageMatch[1], 10);\n    }\n  }\n  \n  // Extract next drip date\n  let nextDripDate = null;\n  if (inDripCampaign) {\n    const dateMatch = notes.match(/NextDripDate:\\s*(\\d{4}-\\d{2}-\\d{2})/);\n    if (dateMatch && dateMatch[1]) {\n      nextDripDate = dateMatch[1];\n    }\n  }\n  \n  // Check if today is on or after the next drip date\n  const isDue = nextDripDate && today >= nextDripDate;\n  \n  return inDripCampaign && isDue && dripStage >= 0 && dripStage < 5; // We have 5 emails in the drip campaign\n});\n\nconsole.log(`Found ${eligibleOrganisers.length} organisers due for drip emails`);\n\n// Process each eligible organiser\nreturn eligibleOrganisers.map(member => {\n  // Extract current drip stage\n  const notes = member.Notes || '';\n  let dripStage = 0;\n  const stageMatch = notes.match(/DripStage:\\s*(\\d+)/);\n  if (stageMatch && stageMatch[1]) {\n    dripStage = parseInt(stageMatch[1], 10);\n  }\n  \n  return {\n    json: {\n      ...member,\n      firstName: member.FirstName || 'Community Member',\n      dripStage: dripStage,\n      nextDripStage: dripStage + 1,\n      nextDripDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 days from now\n    }\n  };\n});"
+      },
+      "name": "Filter for Drip Eligibility",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.dripStage }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Route by Drip Stage",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organiser Resources: Getting Started",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for being part of the BLKOUT NXT community as a QTIPOC Organiser!\n\nAs promised, we're sharing a series of resources to support your work. This first email focuses on getting started with community organizing.\n\nKey Resources:\n1. Community Organizing Basics: https://example.com/organizing-basics\n2. Event Planning Checklist: https://example.com/event-checklist\n3. Inclusive Space Guidelines: https://example.com/inclusive-spaces\n\nWe'll send you more specialized resources over the coming weeks. If you have specific questions or needs, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 1",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organiser Resources: Funding Your Events",
+        "text": "=Dear {{ $json.firstName }},\n\nWe hope you found our first set of resources helpful! This week, we're focusing on funding strategies for your events and initiatives.\n\nKey Resources:\n1. Grant Opportunities for QTIPOC Organisers: https://example.com/grants\n2. Crowdfunding Best Practices: https://example.com/crowdfunding\n3. Budget Templates: https://example.com/budget-templates\n\nRemember, the BLKOUT NXT community is here to support you. If you have questions about funding or want to connect with other organisers, just reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 2",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organiser Resources: Building Your Community",
+        "text": "=Dear {{ $json.firstName }},\n\nWe're back with more resources for QTIPOC Organisers! This week's focus is on building and growing your community.\n\nKey Resources:\n1. Community Engagement Strategies: https://example.com/engagement\n2. Digital Outreach Tools: https://example.com/digital-tools\n3. Creating Sustainable Community Structures: https://example.com/sustainability\n\nWe'd love to hear how your organizing work is going! Feel free to share your experiences or ask questions by replying to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 3",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organiser Resources: Self-Care for Organisers",
+        "text": "=Dear {{ $json.firstName }},\n\nThis week, we're focusing on an essential but often overlooked aspect of community organizing: self-care.\n\nKey Resources:\n1. Burnout Prevention for Activists: https://example.com/burnout-prevention\n2. Setting Boundaries in Community Work: https://example.com/boundaries\n3. Collective Care Practices: https://example.com/collective-care\n\nRemember that taking care of yourself is not selfish—it's necessary for sustainable organizing. We value your wellbeing as much as your contributions to the community.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 4",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Organiser Resources: Collaboration Opportunities",
+        "text": "=Dear {{ $json.firstName }},\n\nThis is the final email in our QTIPOC Organiser resource series. We're focusing on collaboration opportunities within the BLKOUT NXT network.\n\nKey Resources:\n1. BLKOUT NXT Organiser Directory: https://example.com/organiser-directory\n2. Upcoming Collaboration Events: https://example.com/collab-events\n3. Partnership Request Form: https://example.com/partnership-form\n\nWe hope these resources have been helpful! You're now part of our organiser network, and we'll reach out periodically with specific opportunities and updates.\n\nIf you'd like to connect with other organisers or have ideas for the community, please reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 5",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "LastEmailSent",
+              "value": "={{ $now.format(\"YYYY-MM-DD\") }}"
+            },
+            {
+              "column": "EmailHistory",
+              "value": "={{ ($json.EmailHistory ? $json.EmailHistory + \", Organiser Drip \" + ($json.nextDripStage) : \"Organiser Drip \" + ($json.nextDripStage)) }}"
+            },
+            {
+              "column": "Notes",
+              "value": "={{ $json.Notes.replace(/DripStage:\\s*\\d+/, \"DripStage: \" + $json.nextDripStage).replace(/NextDripDate:\\s*\\d{4}-\\d{2}-\\d{2}/, \"NextDripDate: \" + $json.nextDripDate) }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Drip Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "days"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Get Organisers": {
+      "main": [
+        [
+          {
+            "node": "Filter for Drip Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter for Drip Eligibility": {
+      "main": [
+        [
+          {
+            "node": "Route by Drip Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Drip Stage": {
+      "main": [
+        [
+          {
+            "node": "Send Drip Email 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 1": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 2": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 3": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 4": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 5": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Organisers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

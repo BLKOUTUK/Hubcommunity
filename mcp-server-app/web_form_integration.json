@@ -1,0 +1,163 @@
+{
+  "name": "BLKOUT NXT Web Form Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "blkout-nxt-signup",
+        "options": {
+          "responseMode": "responseNode"
+        },
+        "authentication": "none"
+      },
+      "name": "Signup Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process the form data\nconst formData = $input.item.json;\n\n// Log the incoming data\nconsole.log('Received form submission:', JSON.stringify(formData));\n\n// Map form fields to our database structure\nlet role = '';\nif (formData.memberType) {\n  // Convert memberType to our Role values\n  const memberType = formData.memberType.toLowerCase();\n  if (memberType.includes('ally')) {\n    role = 'Ally';\n  } else if (memberType.includes('black queer man') || memberType.includes('bqm')) {\n    role = 'Black Queer Man';\n  } else if (memberType.includes('organiser') || memberType.includes('organizer')) {\n    role = 'QTIPOC Organiser';\n  } else if (memberType.includes('organisation') || memberType.includes('organization')) {\n    role = 'Organisation';\n  } else {\n    role = 'Other';\n  }\n}\n\n// Extract name parts\nlet firstName = formData.firstName || '';\nlet lastName = formData.lastName || '';\n\n// If we only have a full name, try to split it\nif (!firstName && formData.name) {\n  const nameParts = formData.name.split(' ');\n  if (nameParts.length > 0) {\n    firstName = nameParts[0];\n    if (nameParts.length > 1) {\n      lastName = nameParts.slice(1).join(' ');\n    }\n  }\n}\n\n// Format the data for our database\nconst memberData = {\n  Email: formData.email || '',\n  FirstName: firstName,\n  LastName: lastName,\n  Role: role,\n  Organisation: formData.organisation || formData.organization || '',\n  JoinDate: new Date().toISOString().split('T')[0],\n  OnboardingStatus: 'New',\n  Notes: `Source: Web Form; Submission Date: ${new Date().toISOString()}`\n};\n\n// Validate the data\nlet isValid = true;\nlet validationErrors = [];\n\nif (!memberData.Email) {\n  isValid = false;\n  validationErrors.push('Email is required');\n}\n\nif (!memberData.FirstName) {\n  isValid = false;\n  validationErrors.push('First name is required');\n}\n\nif (!isValid) {\n  return {\n    json: {\n      success: false,\n      errors: validationErrors,\n      message: 'Validation failed'\n    }\n  };\n}\n\n// Return the processed data\nreturn {\n  json: memberData\n};"
+      },
+      "name": "Process Form Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "appendOrUpdate",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "columns": "A:J",
+        "keyColumn": "Email",
+        "options": {
+          "valueInputMode": "RAW"
+        }
+      },
+      "name": "Add to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {success: true, message: \"Thank you for signing up for BLKOUT NXT! You'll receive a welcome email shortly.\"} }}",
+        "options": {}
+      },
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {success: false, message: \"There was an error processing your signup. Please try again or contact support.\"} }}",
+        "options": {}
+      },
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.Email }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Signup Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Form Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Form Data": {
+      "main": [
+        [
+          {
+            "node": "Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "Add to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

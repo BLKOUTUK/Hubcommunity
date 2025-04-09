@@ -1,0 +1,391 @@
+{
+  "name": "BLKOUT NXT Onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get New Members",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filter for members who haven't received a welcome email yet\nconst members = $input.all()[0].json;\n\n// Filter for members with OnboardingStatus empty or 'New'\nconst newMembers = members.filter(member => {\n  const status = member.OnboardingStatus || '';\n  return status === '' || status === 'New';\n});\n\nconsole.log(`Found ${newMembers.length} new members to onboard for BLKOUT NXT`);\n\n// Return the filtered members\nreturn newMembers.map(member => {\n  // Determine the segment based on Role\n  let segment = '';\n  const role = (member.Role || '').trim().toLowerCase();\n  \n  if (role.includes('ally')) {\n    segment = 'Ally';\n  } else if (role.includes('black queer man')) {\n    segment = 'BlackQueerMan';\n  } else if (role.includes('qtipoc organiser')) {\n    segment = 'QTIPOCOrganiser';\n  } else if (role.includes('organisation')) {\n    segment = 'Organisation';\n  } else {\n    segment = 'Other';\n  }\n  \n  return {\n    json: {\n      ...member,\n      firstName: member.FirstName || 'Community Member',\n      joinDate: member.JoinDate || new Date().toISOString().split('T')[0],\n      segment: segment,\n      campaign: 'BLKOUT NXT'\n    }\n  };\n});"
+      },
+      "name": "Filter & Segment Members",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.segment }}",
+              "value2": "Ally"
+            }
+          ]
+        }
+      },
+      "name": "Route by Segment",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Welcome to BLKOUT NXT - Ally Community",
+        "text": "=Dear {{ $json.FirstName }},\n\nThank you for joining BLKOUT NXT as an Ally! We're excited to have your support in our community.\n\nAs an Ally in the BLKOUT NXT community, you'll have access to:\n- Educational resources about supporting Black Queer communities\n- Opportunities to participate in allyship workshops\n- Ways to support our initiatives and events\n\nIn the coming days, we'll send you a short survey to better understand how you'd like to contribute as an ally.\n\nIf you have any questions in the meantime, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Ally Welcome",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Welcome to BLKOUT NXT - Black Queer Men's Community",
+        "text": "=Dear {{ $json.FirstName }},\n\nWelcome to BLKOUT NXT! We're thrilled to have you join our community of Black Queer Men.\n\nAs a member of BLKOUT NXT, you'll have access to:\n- Community events and meetups specifically for Black Queer Men\n- Support networks and resources\n- Opportunities to connect with others in the community\n\nIn the coming days, we'll send you a short survey to better understand your interests and how we can best support you.\n\nIf you have any questions in the meantime, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send BQM Welcome",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Welcome to BLKOUT NXT - QTIPOC Organiser Network",
+        "text": "=Dear {{ $json.FirstName }},\n\nWelcome to BLKOUT NXT! We're excited to have you join our network of QTIPOC Organisers.\n\nAs a QTIPOC Organiser in BLKOUT NXT, you'll have access to:\n- Organiser resources and toolkits\n- Networking opportunities with other QTIPOC organisers\n- Collaborative event planning possibilities\n- Support for your community initiatives\n\nIn the coming days, we'll send you a short survey to better understand your organising work and how we can best support your efforts.\n\nIf you have any questions in the meantime, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Organiser Welcome",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Welcome to BLKOUT NXT - Organisation Partnership",
+        "text": "=Dear {{ $json.FirstName }},\n\nThank you for registering {{ $json.Organisation || 'your organisation' }} with BLKOUT NXT! We're excited to explore partnership opportunities together.\n\nAs an organisation partnering with BLKOUT NXT, you'll have access to:\n- Collaboration opportunities on events and initiatives\n- Resources for supporting Black Queer communities\n- Network connections with other aligned organisations\n\nIn the coming days, our partnerships team will reach out to schedule a conversation about how we can best work together.\n\nIf you have any questions in the meantime, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Organisation Welcome",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "Welcome to BLKOUT NXT Community",
+        "text": "=Dear {{ $json.FirstName }},\n\nWelcome to BLKOUT NXT! We're thrilled to have you join our community.\n\nAs a member of BLKOUT NXT, you'll have access to:\n- Community events and workshops\n- Networking opportunities\n- Resources and support\n\nIn the coming days, we'll send you a short survey to better understand your interests and how we can best support you.\n\nIf you have any questions in the meantime, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send General Welcome",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "OnboardingStatus",
+              "value": "Welcome Sent"
+            },
+            {
+              "column": "LastEmailSent",
+              "value": "={{ $now.format(\"YYYY-MM-DD\") }}"
+            },
+            {
+              "column": "EmailHistory",
+              "value": "={{ ($json.EmailHistory ? $json.EmailHistory + \", BLKOUT NXT Welcome\" : \"BLKOUT NXT Welcome\") }}"
+            },
+            {
+              "column": "Notes",
+              "value": "={{ ($json.Notes ? $json.Notes + \"; Segment: \" + $json.segment : \"Segment: \" + $json.segment) }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Member Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "hours"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.Email !== undefined && $json.Email !== \"\" }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Has Valid Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log error for members without email\nconst member = $input.item.json;\n\nconsole.log(`Error: BLKOUT NXT member without valid email address. Data: ${JSON.stringify(member)}`);\n\nreturn $input.item;"
+      },
+      "name": "Log Error",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ]
+    }
+  ],
+  "connections": {
+    "Get New Members": {
+      "main": [
+        [
+          {
+            "node": "Filter & Segment Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Segment Members": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Segment": {
+      "main": [
+        [
+          {
+            "node": "Send Ally Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send BQM Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Organiser Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Organisation Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send General Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Ally Welcome": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send BQM Welcome": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Organiser Welcome": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Organisation Welcome": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send General Welcome": {
+      "main": [
+        [
+          {
+            "node": "Update Member Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get New Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Email?": {
+      "main": [
+        [
+          {
+            "node": "Route by Segment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

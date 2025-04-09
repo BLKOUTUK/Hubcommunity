@@ -1,0 +1,339 @@
+{
+  "name": "BLKOUT NXT Ally Drip Campaign",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Allies",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filter for allies in the drip campaign\nconst members = $input.all()[0].json;\nconst today = new Date().toISOString().split('T')[0];\n\n// Filter for members in the Ally drip campaign who are due for next email\nconst eligibleAllies = members.filter(member => {\n  // Check if they're an Ally\n  const isAlly = (member.Role || '').toLowerCase().includes('ally');\n  \n  // Check if they've completed the survey\n  const hasCompletedSurvey = (member.OnboardingStatus || '').includes('Survey Completed');\n  \n  // Check if they're in the Ally drip campaign\n  const notes = member.Notes || '';\n  const inDripCampaign = notes.includes('DripCampaign: Ally');\n  \n  // Extract drip stage\n  let dripStage = -1;\n  if (inDripCampaign) {\n    const stageMatch = notes.match(/DripStage:\\s*(\\d+)/);\n    if (stageMatch && stageMatch[1]) {\n      dripStage = parseInt(stageMatch[1], 10);\n    }\n  }\n  \n  // Extract next drip date\n  let nextDripDate = null;\n  if (inDripCampaign) {\n    const dateMatch = notes.match(/NextDripDate:\\s*(\\d{4}-\\d{2}-\\d{2})/);\n    if (dateMatch && dateMatch[1]) {\n      nextDripDate = dateMatch[1];\n    }\n  }\n  \n  // Check if today is on or after the next drip date\n  const isDue = nextDripDate && today >= nextDripDate;\n  \n  // If they're not in the drip campaign yet but have completed the survey, add them\n  if (isAlly && hasCompletedSurvey && !inDripCampaign) {\n    return true;\n  }\n  \n  // If they're in the drip campaign and due for next email, include them\n  return isAlly && inDripCampaign && isDue && dripStage >= 0 && dripStage < 5; // We have 5 emails in the drip campaign\n});\n\nconsole.log(`Found ${eligibleAllies.length} allies due for drip emails`);\n\n// Process each eligible ally\nreturn eligibleAllies.map(member => {\n  // Extract current drip stage\n  const notes = member.Notes || '';\n  let dripStage = 0;\n  const inDripCampaign = notes.includes('DripCampaign: Ally');\n  \n  if (inDripCampaign) {\n    const stageMatch = notes.match(/DripStage:\\s*(\\d+)/);\n    if (stageMatch && stageMatch[1]) {\n      dripStage = parseInt(stageMatch[1], 10);\n    }\n  }\n  \n  return {\n    json: {\n      ...member,\n      firstName: member.FirstName || 'Community Member',\n      dripStage: dripStage,\n      nextDripStage: dripStage + 1,\n      nextDripDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now\n      dripCampaign: 'Ally'\n    }\n  };\n});"
+      },
+      "name": "Filter for Drip Eligibility",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.dripStage }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Route by Drip Stage",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Ally Resources: Understanding Allyship",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for being an ally to the BLKOUT NXT community! We're excited to share resources that will help you be an effective ally to Black Queer communities.\n\nThis first email focuses on understanding allyship and its importance:\n\n1. What is Allyship?: https://example.com/understanding-allyship\n2. Listening and Learning: https://example.com/listening-skills\n3. Recognizing Privilege: https://example.com/privilege-awareness\n\nWe'll send you more specialized resources over the coming weeks. If you have specific questions about allyship, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 1",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Ally Resources: Taking Action",
+        "text": "=Dear {{ $json.firstName }},\n\nWe hope you found our first set of resources helpful! This week, we're focusing on how allies can take meaningful action to support Black Queer communities.\n\nKey Resources:\n1. Effective Advocacy Strategies: https://example.com/advocacy-strategies\n2. Speaking Up Against Discrimination: https://example.com/speaking-up\n3. Supporting Black Queer Businesses and Artists: https://example.com/support-directory\n\nRemember, allyship is an ongoing practice, not a destination. If you have questions about these resources or want to share your experiences, just reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 2",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Ally Resources: Education and Growth",
+        "text": "=Dear {{ $json.firstName }},\n\nWe're back with more resources for allies! This week's focus is on continuing your education and growth as an ally to Black Queer communities.\n\nKey Resources:\n1. Recommended Reading List: https://example.com/ally-reading-list\n2. Documentaries and Films: https://example.com/documentaries\n3. Podcasts by Black Queer Creators: https://example.com/podcasts\n\nContinuing to learn and grow is an essential part of allyship. We'd love to hear what resources you've found most helpful in your journey.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 3",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Ally Resources: Community Engagement",
+        "text": "=Dear {{ $json.firstName }},\n\nThis week, we're focusing on how allies can respectfully engage with and support Black Queer communities.\n\nKey Resources:\n1. Attending Events as an Ally: https://example.com/event-etiquette\n2. Amplifying Black Queer Voices: https://example.com/amplification\n3. Creating Inclusive Spaces: https://example.com/inclusive-spaces\n\nRemember that being a good ally means knowing when to step up and when to step back. Your presence and support are valuable when offered thoughtfully and respectfully.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 4",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Ally Resources: Ongoing Allyship",
+        "text": "=Dear {{ $json.firstName }},\n\nThis is the final email in our ally resource series. We're focusing on making allyship an ongoing practice in your life.\n\nKey Resources:\n1. Sustaining Your Allyship: https://example.com/sustainable-allyship\n2. Finding Community as an Ally: https://example.com/ally-community\n3. Upcoming Ally Workshops: https://example.com/ally-workshops\n\nWe hope these resources have been helpful in your allyship journey! You're now part of our ally network, and we'll reach out periodically with specific opportunities and updates.\n\nIf you'd like to get more involved or have ideas for supporting the community, please reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 5",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "LastEmailSent",
+              "value": "={{ $now.format(\"YYYY-MM-DD\") }}"
+            },
+            {
+              "column": "EmailHistory",
+              "value": "={{ ($json.EmailHistory ? $json.EmailHistory + \", Ally Drip \" + ($json.nextDripStage) : \"Ally Drip \" + ($json.nextDripStage)) }}"
+            },
+            {
+              "column": "Notes",
+              "value": "={{ $json.Notes ? ($json.Notes.includes(\"DripCampaign: Ally\") ? $json.Notes.replace(/DripStage:\\s*\\d+/, \"DripStage: \" + $json.nextDripStage).replace(/NextDripDate:\\s*\\d{4}-\\d{2}-\\d{2}/, \"NextDripDate: \" + $json.nextDripDate) : $json.Notes + \"; DripCampaign: Ally; DripStage: \" + $json.nextDripStage + \"; NextDripDate: \" + $json.nextDripDate) : \"DripCampaign: Ally; DripStage: \" + $json.nextDripStage + \"; NextDripDate: \" + $json.nextDripDate }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Drip Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "days"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Get Allies": {
+      "main": [
+        [
+          {
+            "node": "Filter for Drip Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter for Drip Eligibility": {
+      "main": [
+        [
+          {
+            "node": "Route by Drip Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Drip Stage": {
+      "main": [
+        [
+          {
+            "node": "Send Drip Email 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 1": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 2": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 3": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 4": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 5": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Allies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

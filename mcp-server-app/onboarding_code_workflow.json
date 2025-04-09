@@ -1,0 +1,89 @@
+{
+  "name": "BLKOUT NXT Onboarding (Code Node)",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get New Members",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Code node for BLKOUT NXT Onboarding workflow\n// Replaces the \"Filter & Segment Members\" Function node\n\n// Get input data\nconst items = $input.all();\nconsole.log(`Received ${items.length} items from Google Sheets`);\n\n// Extract members from the items\nlet members = [];\nif (items.length > 0 && items[0].json) {\n  if (Array.isArray(items[0].json)) {\n    members = items[0].json;\n  } else {\n    members = [items[0].json];\n  }\n}\n\nconsole.log(`Extracted ${members.length} members`);\n\n// Filter for new members\nconst newMembers = members.filter(member => {\n  if (!member || typeof member !== 'object') return false;\n  const status = member.OnboardingStatus || '';\n  return status === '' || status === 'New';\n});\n\nconsole.log(`Found ${newMembers.length} new members to onboard`);\n\n// Process and return the new members\nreturn newMembers.map(member => {\n  // Determine segment based on Role\n  let segment = 'Other';\n  const role = (member.Role || '').toString().trim().toLowerCase();\n  \n  if (role.includes('ally')) {\n    segment = 'Ally';\n  } else if (role.includes('black queer man')) {\n    segment = 'BlackQueerMan';\n  } else if (role.includes('qtipoc organiser')) {\n    segment = 'QTIPOCOrganiser';\n  } else if (role.includes('organisation')) {\n    segment = 'Organisation';\n  }\n  \n  return {\n    json: {\n      ...member,\n      firstName: member.FirstName || 'Community Member',\n      joinDate: member.JoinDate || new Date().toISOString().split('T')[0],\n      segment: segment,\n      campaign: 'BLKOUT NXT'\n    }\n  };\n});"
+      },
+      "name": "Filter & Segment Members (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.segment }}",
+              "value2": "Ally"
+            }
+          ]
+        }
+      },
+      "name": "Route by Segment",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Get New Members": {
+      "main": [
+        [
+          {
+            "node": "Filter & Segment Members (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Segment Members (Code)": {
+      "main": [
+        [
+          {
+            "node": "Route by Segment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

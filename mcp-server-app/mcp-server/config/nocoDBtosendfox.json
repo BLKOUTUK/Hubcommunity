@@ -1,0 +1,227 @@
+{
+  "name": "NocoDB to SendFox Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nocodb-sendfox-webhook",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.NOCODB_API_URL_COMMUNITYMEMBERS}}",
+        "authentication": "genericHeader",
+        "genericAuthenticationHeader": "xc-token",
+        "genericAuthenticationValue": "={{$env.NOCODB_API_TOKEN}}",
+        "options": {}
+      },
+      "name": "Get NocoDB Records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get the data from NocoDB\nconst nocodbData = $input.json.list || [];\n\n// Process each record\nreturn nocodbData.map(record => {\n  return {\n    json: {\n      email: record.email,\n      name: record.name || '',\n      userType: record.userType || '',\n      organisation: record.organisation || ''\n    }\n  };\n});"
+      },
+      "name": "Process Records",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.sendfox.com/contacts",
+        "authentication": "genericHeader",
+        "genericAuthenticationHeader": "Authorization",
+        "genericAuthenticationValue": "Bearer {{$env.SENDFOX_API_KEY}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {},
+        "bodyContent": "={\n  \"email\": $json.email,\n  \"first_name\": $json.name\n}",
+        "options": {}
+      },
+      "name": "Send to SendFox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json?.statusCode }}",
+              "operation": "equal",
+              "value2": 200
+            }
+          ]
+        }
+      },
+      "name": "Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "success",
+              "value": "true"
+            },
+            {
+              "name": "message",
+              "value": "Contact added to SendFox successfully"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Success Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "success",
+              "value": "false"
+            },
+            {
+              "name": "message",
+              "value": "Failed to add contact to SendFox"
+            },
+            {
+              "name": "error",
+              "value": "={{ $json.error || $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Error Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get NocoDB Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get NocoDB Records": {
+      "main": [
+        [
+          {
+            "node": "Process Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Records": {
+      "main": [
+        [
+          {
+            "node": "Send to SendFox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to SendFox": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

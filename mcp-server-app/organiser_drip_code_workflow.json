@@ -1,0 +1,90 @@
+{
+  "name": "BLKOUT NXT QTIPOC Organiser Drip Campaign (Code Node)",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Organisers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Code node for BLKOUT NXT QTIPOC Organiser Drip Campaign workflow\n// Replaces the \"Filter for Drip Eligibility\" Function node\n\n// Get input data\nconst items = $input.all();\nconsole.log(`Received ${items.length} items from Google Sheets`);\n\n// Extract members from the items\nlet members = [];\nif (items.length > 0 && items[0].json) {\n  if (Array.isArray(items[0].json)) {\n    members = items[0].json;\n  } else {\n    members = [items[0].json];\n  }\n}\n\nconsole.log(`Extracted ${members.length} members`);\n\n// Helper function to get property safely\nconst getMemberProp = (member, propName, defaultValue = '') => {\n  if (member[propName] !== undefined) return member[propName];\n  if (member.json && member.json[propName] !== undefined) return member.json[propName];\n  return defaultValue;\n};\n\n// Get current date for comparison\nconst today = new Date().toISOString().split('T')[0];\n\n// Filter for QTIPOC Organiser members in the drip campaign who are due for next email\nconst eligibleMembers = members.filter(member => {\n  // Skip items that aren't objects\n  if (!member || typeof member !== 'object') {\n    return false;\n  }\n  \n  // Check if they're a QTIPOC Organiser\n  const role = (getMemberProp(member, 'Role', '')).toString().toLowerCase();\n  const isOrganiser = role.includes('qtipoc organiser');\n  \n  // Check if they've completed the survey\n  const status = getMemberProp(member, 'OnboardingStatus', '');\n  const hasCompletedSurvey = status.includes('Survey Completed');\n  \n  // Check if they're in the Organiser drip campaign\n  const notes = getMemberProp(member, 'Notes', '');\n  const inDripCampaign = notes.includes('DripCampaign: QTIPOCOrganiser');\n  \n  // Extract drip stage\n  let dripStage = -1;\n  if (inDripCampaign) {\n    const stageMatch = notes.match(/DripStage:\\s*(\\d+)/);\n    if (stageMatch && stageMatch[1]) {\n      dripStage = parseInt(stageMatch[1], 10);\n    }\n  }\n  \n  // Extract next drip date\n  let nextDripDate = null;\n  if (inDripCampaign) {\n    const dateMatch = notes.match(/NextDripDate:\\s*(\\d{4}-\\d{2}-\\d{2})/);\n    if (dateMatch && dateMatch[1]) {\n      nextDripDate = dateMatch[1];\n    }\n  }\n  \n  // Check if today is on or after the next drip date\n  const isDue = nextDripDate && today >= nextDripDate;\n  \n  // If they're not in the drip campaign yet but have completed the survey, add them\n  if (isOrganiser && hasCompletedSurvey && !inDripCampaign) {\n    return true;\n  }\n  \n  // If they're in the drip campaign and due for next email, include them\n  return isOrganiser && inDripCampaign && isDue && dripStage >= 0 && dripStage < 5; // We have 5 emails in the drip campaign\n});\n\nconsole.log(`Found ${eligibleMembers.length} QTIPOC Organiser members due for drip emails`);\n\n// Process each eligible member\nreturn eligibleMembers.map(member => {\n  // Extract current drip stage\n  const notes = getMemberProp(member, 'Notes', '');\n  let dripStage = 0;\n  const inDripCampaign = notes.includes('DripCampaign: QTIPOCOrganiser');\n  \n  if (inDripCampaign) {\n    const stageMatch = notes.match(/DripStage:\\s*(\\d+)/);\n    if (stageMatch && stageMatch[1]) {\n      dripStage = parseInt(stageMatch[1], 10);\n    }\n  }\n  \n  return {\n    json: {\n      ...member,\n      firstName: getMemberProp(member, 'FirstName', 'Community Member'),\n      dripStage: dripStage,\n      nextDripStage: dripStage + 1,\n      nextDripDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now\n      dripCampaign: 'QTIPOCOrganiser'\n    }\n  };\n});"
+      },
+      "name": "Filter for Drip Eligibility (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.dripStage }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Route by Drip Stage",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Get Organisers": {
+      "main": [
+        [
+          {
+            "node": "Filter for Drip Eligibility (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter for Drip Eligibility (Code)": {
+      "main": [
+        [
+          {
+            "node": "Route by Drip Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

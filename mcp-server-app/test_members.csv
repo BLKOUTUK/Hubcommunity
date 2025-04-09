@@ -1,0 +1,5 @@
+Email,FirstName,LastName,Role,Organisation,JoinDate,OnboardingStatus,LastEmailSent,EmailHistory,Notes
+test_ally_1@example.com,Test,Ally,Ally,Test Org,2023-07-25,New,,,Test member for onboarding flow
+test_bqm_1@example.com,Test,BQM,Black Queer Man,Test Org,2023-07-25,New,,,Test member for onboarding flow
+test_organiser_1@example.com,Test,Organiser,QTIPOC Organiser,Test Org,2023-07-25,New,,,Test member for onboarding flow
+test_org_1@example.com,Test,Organisation,Organisation,Test Organisation,2023-07-25,New,,,Test member for onboarding flow

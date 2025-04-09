@@ -1,0 +1,339 @@
+{
+  "name": "BLKOUT NXT Organisation Drip Campaign",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Organisations",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filter for organisations in the drip campaign\nconst members = $input.all()[0].json;\nconst today = new Date().toISOString().split('T')[0];\n\n// Filter for members in the Organisation drip campaign who are due for next email\nconst eligibleOrgs = members.filter(member => {\n  // Check if they're an Organisation\n  const isOrg = (member.Role || '').toLowerCase().includes('organisation');\n  \n  // Check if they've completed the survey\n  const hasCompletedSurvey = (member.OnboardingStatus || '').includes('Survey Completed');\n  \n  // Check if they're in the Organisation drip campaign\n  const notes = member.Notes || '';\n  const inDripCampaign = notes.includes('DripCampaign: Organisation');\n  \n  // Extract drip stage\n  let dripStage = -1;\n  if (inDripCampaign) {\n    const stageMatch = notes.match(/DripStage:\\s*(\\d+)/);\n    if (stageMatch && stageMatch[1]) {\n      dripStage = parseInt(stageMatch[1], 10);\n    }\n  }\n  \n  // Extract next drip date\n  let nextDripDate = null;\n  if (inDripCampaign) {\n    const dateMatch = notes.match(/NextDripDate:\\s*(\\d{4}-\\d{2}-\\d{2})/);\n    if (dateMatch && dateMatch[1]) {\n      nextDripDate = dateMatch[1];\n    }\n  }\n  \n  // Check if today is on or after the next drip date\n  const isDue = nextDripDate && today >= nextDripDate;\n  \n  // If they're not in the drip campaign yet but have completed the survey, add them\n  if (isOrg && hasCompletedSurvey && !inDripCampaign) {\n    return true;\n  }\n  \n  // If they're in the drip campaign and due for next email, include them\n  return isOrg && inDripCampaign && isDue && dripStage >= 0 && dripStage < 5; // We have 5 emails in the drip campaign\n});\n\nconsole.log(`Found ${eligibleOrgs.length} organisations due for drip emails`);\n\n// Process each eligible organisation\nreturn eligibleOrgs.map(member => {\n  // Extract current drip stage\n  const notes = member.Notes || '';\n  let dripStage = 0;\n  const inDripCampaign = notes.includes('DripCampaign: Organisation');\n  \n  if (inDripCampaign) {\n    const stageMatch = notes.match(/DripStage:\\s*(\\d+)/);\n    if (stageMatch && stageMatch[1]) {\n      dripStage = parseInt(stageMatch[1], 10);\n    }\n  }\n  \n  return {\n    json: {\n      ...member,\n      firstName: member.FirstName || 'Community Member',\n      orgName: member.Organisation || 'your organisation',\n      dripStage: dripStage,\n      nextDripStage: dripStage + 1,\n      nextDripDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now\n      dripCampaign: 'Organisation'\n    }\n  };\n});"
+      },
+      "name": "Filter for Drip Eligibility",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.dripStage }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Route by Drip Stage",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Partnership Resources: Getting Started",
+        "text": "=Dear {{ $json.firstName }},\n\nThank you for registering {{ $json.orgName }} with BLKOUT NXT! We're excited to explore partnership opportunities together.\n\nThis first email focuses on ways our organisations can collaborate:\n\n1. Partnership Opportunities Overview: https://example.com/partnership-overview\n2. Upcoming Collaboration Events: https://example.com/collab-events\n3. Community Support Guidelines: https://example.com/support-guidelines\n\nWe'll send you more specialized resources over the coming weeks. If you have specific questions about partnership opportunities, feel free to reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 1",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Partnership Resources: Event Collaboration",
+        "text": "=Dear {{ $json.firstName }},\n\nWe hope you found our first set of resources helpful! This week, we're focusing on event collaboration opportunities between {{ $json.orgName }} and BLKOUT NXT.\n\nKey Resources:\n1. Co-Hosting Events Guide: https://example.com/co-hosting\n2. Venue Sharing Opportunities: https://example.com/venue-sharing\n3. Cross-Promotion Strategies: https://example.com/cross-promotion\n\nEvents are a powerful way for our organisations to work together. If you have upcoming events where you'd like to explore collaboration, please let us know.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 2",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Partnership Resources: Funding and Grants",
+        "text": "=Dear {{ $json.firstName }},\n\nWe're back with more resources for organisational partners! This week's focus is on funding and grant opportunities for collaborative projects.\n\nKey Resources:\n1. Joint Funding Opportunities: https://example.com/joint-funding\n2. Grant Writing Collaboration: https://example.com/grant-writing\n3. Resource Sharing Framework: https://example.com/resource-sharing\n\nCollaborating on funding applications can increase our chances of success and allow us to create more impactful projects together. If you're interested in exploring joint funding opportunities, let us know.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 3",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Partnership Resources: Community Engagement",
+        "text": "=Dear {{ $json.firstName }},\n\nThis week, we're focusing on strategies for joint community engagement between {{ $json.orgName }} and BLKOUT NXT.\n\nKey Resources:\n1. Community Needs Assessment: https://example.com/needs-assessment\n2. Collaborative Outreach Strategies: https://example.com/outreach\n3. Measuring Community Impact: https://example.com/impact-measurement\n\nBy working together, we can reach more community members and create more meaningful engagement. We'd love to hear about your organisation's approach to community engagement and explore ways we can collaborate.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 4",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "nxt@blkouthub.org",
+        "toEmail": "={{ $json.Email }}",
+        "subject": "BLKOUT NXT - Partnership Resources: Long-term Collaboration",
+        "text": "=Dear {{ $json.firstName }},\n\nThis is the final email in our organisational partnership resource series. We're focusing on establishing long-term collaboration between {{ $json.orgName }} and BLKOUT NXT.\n\nKey Resources:\n1. Strategic Partnership Agreement Template: https://example.com/partnership-agreement\n2. Long-term Planning Framework: https://example.com/long-term-planning\n3. Partnership Evaluation Tools: https://example.com/partnership-evaluation\n\nWe hope these resources have been helpful! You're now part of our partner network, and we'll reach out periodically with specific opportunities and updates.\n\nIf you'd like to schedule a meeting to discuss partnership opportunities in more detail, please reply to this email.\n\nBest regards,\nThe BLKOUT NXT Team",
+        "options": {}
+      },
+      "name": "Send Drip Email 5",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        200,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "updateRow",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "keyRow": "Email",
+        "keyValue": "={{ $json.Email }}",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "dataMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "LastEmailSent",
+              "value": "={{ $now.format(\"YYYY-MM-DD\") }}"
+            },
+            {
+              "column": "EmailHistory",
+              "value": "={{ ($json.EmailHistory ? $json.EmailHistory + \", Organisation Drip \" + ($json.nextDripStage) : \"Organisation Drip \" + ($json.nextDripStage)) }}"
+            },
+            {
+              "column": "Notes",
+              "value": "={{ $json.Notes ? ($json.Notes.includes(\"DripCampaign: Organisation\") ? $json.Notes.replace(/DripStage:\\s*\\d+/, \"DripStage: \" + $json.nextDripStage).replace(/NextDripDate:\\s*\\d{4}-\\d{2}-\\d{2}/, \"NextDripDate: \" + $json.nextDripDate) : $json.Notes + \"; DripCampaign: Organisation; DripStage: \" + $json.nextDripStage + \"; NextDripDate: \" + $json.nextDripDate) : \"DripCampaign: Organisation; DripStage: \" + $json.nextDripStage + \"; NextDripDate: \" + $json.nextDripDate }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Drip Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "days"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Get Organisations": {
+      "main": [
+        [
+          {
+            "node": "Filter for Drip Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter for Drip Eligibility": {
+      "main": [
+        [
+          {
+            "node": "Route by Drip Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Drip Stage": {
+      "main": [
+        [
+          {
+            "node": "Send Drip Email 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Drip Email 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 1": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 2": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 3": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 4": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email 5": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Organisations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

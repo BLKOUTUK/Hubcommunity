@@ -1,0 +1,89 @@
+{
+  "name": "BLKOUT NXT Survey Follow-up (Code Node)",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "readRows",
+        "documentId": "1EDTTmhBGiZdhKuLwCQLDduRuIE2oQmXfeJvoiowU4bs",
+        "sheetName": "Community Members",
+        "range": "A:J",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE",
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "name": "Get Members for Survey",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Code node for BLKOUT NXT Survey Follow-up workflow\n// Replaces the \"Filter for Survey Eligibility\" Function node\n\n// Get input data\nconst items = $input.all();\nconsole.log(`Received ${items.length} items from Google Sheets`);\n\n// Extract members from the items\nlet members = [];\nif (items.length > 0 && items[0].json) {\n  if (Array.isArray(items[0].json)) {\n    members = items[0].json;\n  } else {\n    members = [items[0].json];\n  }\n}\n\nconsole.log(`Extracted ${members.length} members`);\n\n// Helper function to get property safely\nconst getMemberProp = (member, propName, defaultValue = '') => {\n  if (member[propName] !== undefined) return member[propName];\n  if (member.json && member.json[propName] !== undefined) return member.json[propName];\n  return defaultValue;\n};\n\n// Filter for members who need survey emails or reminders\nconst now = new Date();\n\n// Two types of members we're looking for:\n// 1. Those who received welcome email 6+ hours ago but haven't received survey email\n// 2. Those who received survey email 3+ days ago but haven't completed survey\n\nconst eligibleMembers = members.filter(member => {\n  // Skip items that aren't objects\n  if (!member || typeof member !== 'object') {\n    return false;\n  }\n  \n  const email = getMemberProp(member, 'Email', '');\n  const status = getMemberProp(member, 'OnboardingStatus', '');\n  const emailHistory = getMemberProp(member, 'EmailHistory', '');\n  const lastEmailDate = getMemberProp(member, 'LastEmailSent', '');\n  \n  // Skip if no email or last email date\n  if (!email || !lastEmailDate) return false;\n  \n  // Parse the last email date\n  const lastEmailTime = new Date(lastEmailDate).getTime();\n  const currentTime = now.getTime();\n  \n  // Calculate hours since last email\n  const hoursSinceLastEmail = Math.floor((currentTime - lastEmailTime) / (1000 * 60 * 60));\n  \n  // Calculate days since last email\n  const daysSinceLastEmail = Math.floor(hoursSinceLastEmail / 24);\n  \n  // Case 1: Received welcome email 6+ hours ago but not survey email\n  const receivedWelcome = status === 'Welcome Sent' || emailHistory.includes('Welcome');\n  const receivedSurvey = emailHistory.includes('Survey');\n  const readyForSurvey = receivedWelcome && !receivedSurvey && hoursSinceLastEmail >= 6;\n  \n  // Case 2: Received survey email 3+ days ago but no survey completion\n  const surveyNotCompleted = status === 'Survey Sent' && !status.includes('Completed');\n  const needsReminder = surveyNotCompleted && daysSinceLastEmail >= 3 && !emailHistory.includes('Reminder');\n  \n  return readyForSurvey || needsReminder;\n});\n\nconsole.log(`Found ${eligibleMembers.length} members for survey emails or reminders`);\n\n// Determine segment and email type for each eligible member\nreturn eligibleMembers.map(member => {\n  // Extract segment from Notes field or determine from Role\n  let segment = '';\n  \n  // First try to get segment from Notes field\n  const notes = getMemberProp(member, 'Notes', '');\n  if (notes.includes('Segment:')) {\n    const segmentMatch = notes.match(/Segment:\\s*(\\w+)/);\n    if (segmentMatch && segmentMatch[1]) {\n      segment = segmentMatch[1];\n    }\n  }\n  \n  // If segment not found in Notes, determine from Role\n  if (!segment) {\n    const role = (getMemberProp(member, 'Role', '')).toString().trim().toLowerCase();\n    \n    if (role.includes('ally')) {\n      segment = 'Ally';\n    } else if (role.includes('black queer man')) {\n      segment = 'BlackQueerMan';\n    } else if (role.includes('qtipoc organiser')) {\n      segment = 'QTIPOCOrganiser';\n    } else if (role.includes('organisation')) {\n      segment = 'Organisation';\n    } else {\n      segment = 'Other';\n    }\n  }\n  \n  // Determine if this is a reminder\n  const emailHistory = getMemberProp(member, 'EmailHistory', '');\n  const isReminder = emailHistory.includes('Survey');\n  \n  return {\n    json: {\n      ...member,\n      firstName: getMemberProp(member, 'FirstName', 'Community Member'),\n      segment: segment,\n      campaign: 'BLKOUT NXT',\n      isReminder: isReminder\n    }\n  };\n});"
+      },
+      "name": "Filter for Survey Eligibility (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isReminder }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Reminder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Get Members for Survey": {
+      "main": [
+        [
+          {
+            "node": "Filter for Survey Eligibility (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter for Survey Eligibility (Code)": {
+      "main": [
+        [
+          {
+            "node": "Is Reminder?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
