@@ -18,10 +18,17 @@ class MemberManager:
 
     def ensure_file_exists(self):
         """Ensure the JSON file exists, creating it if necessary."""
+        # Always create the directory (no harm if it already exists)
         os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+        logger.info(f"Ensuring directory exists: {os.path.dirname(self.file_path)}")
+
         if not os.path.exists(self.file_path):
+            logger.info(f"Creating new members file: {self.file_path}")
+            # Create an empty JSON file
             with open(self.file_path, 'w') as f:
                 json.dump({"members": []}, f)
+        else:
+            logger.info(f"Members file already exists: {self.file_path}")
 
     def load_data(self):
         """Load the member data from the JSON file."""
