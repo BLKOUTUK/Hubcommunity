@@ -1,6 +1,7 @@
 # Ignore archive and old directories
 /archive/
 /mcp-server-app/
+/mcp-server-app-files/
 
 # Environment variables
 .env
@@ -31,6 +32,18 @@ var/
 *.log
 logs/
 data/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# ngrok
+ngrok-*/
+
+# Python cache
+__pycache__/
+.pytest_cache/
 
 # Virtual Environment
 venv/
