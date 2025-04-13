@@ -10,7 +10,7 @@ The BLKOUT NXT Onboarding System provides:
 - Email drip campaigns for different user categories
 - Survey follow-up management
 - Member data storage and management
-- Integration with Google Sheets
+- Local JSON storage for member data
 
 ## Project Structure
 
@@ -34,7 +34,7 @@ https://blkout-nxt-backend.onrender.com/webhook/blkout-nxt-signup
 
 Update the `blkout_nxt_config.json` file to modify:
 
-- Google Sheets integration settings
+- Data storage settings
 - Email addresses for notifications
 - Survey links
 - Drip campaign resource links
