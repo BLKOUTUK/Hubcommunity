@@ -1,0 +1,3 @@
+@echo off
+echo Starting N8N Integration Server...
+python c:\Users\robbe\hub_community\hub_community\mcp-server-app\mcp-server\integration-server\n8n\n8n_server.py

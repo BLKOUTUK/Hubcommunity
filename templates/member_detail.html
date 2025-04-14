@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+
+{% block title %}{{ member.name }} - BLKOUTHUB{% endblock %}
+
+{% block page_title %}Member Details{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Member Profile -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-user me-2"></i> Profile
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div style="width: 100px; height: 100px; background-color: #6200ea; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto;">
+                        {{ member.name[0] }}
+                    </div>
+                    <h4 class="mt-3">{{ member.name }}</h4>
+                    <p class="text-muted">{{ member.email }}</p>
+                    <span class="badge bg-info">{{ member.member_type }}</span>
+                </div>
+                
+                <div class="mb-3">
+                    <strong>Member ID:</strong> {{ member.id }}
+                </div>
+                <div class="mb-3">
+                    <strong>Joined:</strong> {{ member.created_at.split('T')[0] if member.created_at else 'Unknown' }}
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success award-points-btn" data-member-id="{{ member.id }}" data-member-name="{{ member.name }}">
+                        <i class="fas fa-plus-circle"></i> Award Points
+                    </button>
+                    <button class="btn btn-primary check-achievements-btn" data-member-id="{{ member.id }}">
+                        <i class="fas fa-medal"></i> Check Achievements
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rewards Information -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-trophy me-2"></i> Rewards
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card stat-card">
+                            <i class="fas fa-star"></i>
+                            <div class="stat-value">{{ rewards.level }}</div>
+                            <div class="stat-label">Level</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card">
+                            <i class="fas fa-coins"></i>
+                            <div class="stat-value">{{ rewards.current_points }}</div>
+                            <div class="stat-label">Current Points</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card">
+                            <i class="fas fa-medal"></i>
+                            <div class="stat-value">{{ rewards.achievements|length }}</div>
+                            <div class="stat-label">Achievements</div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if access_level %}
+                <div class="mt-4">
+                    <h5>Access Level</h5>
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ access_level.name }}</h5>
+                            <p class="card-text">{{ access_level.description }}</p>
+                            <h6>Features:</h6>
+                            <ul>
+                                {% for feature in access_level.features %}
+                                <li>{{ feature }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if rewards.achievements %}
+                <div class="mt-4">
+                    <h5>Achievements</h5>
+                    <div class="row">
+                        {% for achievement in rewards.achievements %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ achievement.name }}</h5>
+                                    <p class="card-text">{{ achievement.description }}</p>
+                                    {% if achievement.bonus_points %}
+                                    <span class="badge badge-points">+{{ achievement.bonus_points }} points</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Challenges -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-tasks me-2"></i> Challenges
+            </div>
+            <div class="card-body">
+                {% if challenges %}
+                <div class="list-group">
+                    {% for challenge_progress in challenges %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">{{ challenge_progress.challenge.name }}</h5>
+                            {% if challenge_progress.completed %}
+                            <span class="badge bg-success">Completed</span>
+                            {% else %}
+                            <span class="badge bg-warning">In Progress</span>
+                            {% endif %}
+                        </div>
+                        <p class="mb-1">{{ challenge_progress.challenge.description }}</p>
+                        <div class="progress mt-2">
+                            <div class="progress-bar" role="progressbar" style="width: {{ challenge_progress.progress * 100 }}%;" aria-valuenow="{{ challenge_progress.progress * 100 }}" aria-valuemin="0" aria-valuemax="100">{{ (challenge_progress.progress * 100)|int }}%</div>
+                        </div>
+                        {% if not challenge_progress.completed and challenge_progress.progress >= 1.0 %}
+                        <button class="btn btn-sm btn-success mt-2 complete-challenge-btn" data-member-id="{{ member.id }}" data-challenge-id="{{ challenge_progress.challenge.id }}">
+                            <i class="fas fa-check"></i> Complete Challenge
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center">No challenges found</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Events Attended -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-calendar-check me-2"></i> Events Attended
+            </div>
+            <div class="card-body">
+                {% if events_attended %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Date</th>
+                                <th>Check-in</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events_attended %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('event_detail', event_id=event.event_id) }}">
+                                        {{ event.name }}
+                                    </a>
+                                </td>
+                                <td>{{ event.event_date.split('T')[0] if event.event_date else 'Unknown' }}</td>
+                                <td>{{ event.check_in_time.split('T')[0] if event.check_in_time else 'Unknown' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center">No events attended</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Notifications -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bell me-2"></i> Notifications
+            </div>
+            <div class="card-body">
+                {% if notifications %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Title</th>
+                                <th>Message</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for notification in notifications %}
+                            <tr>
+                                <td>
+                                    {% if notification.type == 'achievement' %}
+                                    <span class="badge badge-achievement">Achievement</span>
+                                    {% elif notification.type == 'level_up' %}
+                                    <span class="badge badge-level">Level Up</span>
+                                    {% elif notification.type == 'challenge_completion' %}
+                                    <span class="badge badge-points">Challenge</span>
+                                    {% elif notification.type == 'access_level_change' %}
+                                    <span class="badge badge-event">Access Level</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ notification.type }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ notification.title }}</td>
+                                <td>{{ notification.message }}</td>
+                                <td>{{ notification.created_at.split('T')[0] }}</td>
+                                <td>
+                                    {% if notification.read %}
+                                    <span class="badge bg-success">Read</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">Unread</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not notification.read %}
+                                    <button class="btn btn-sm btn-primary mark-read-btn" data-notification-id="{{ notification.id }}">
+                                        <i class="fas fa-check"></i> Mark Read
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center">No notifications found</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Award Points Modal -->
+<div class="modal fade" id="awardPointsModal" tabindex="-1" aria-labelledby="awardPointsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="awardPointsModalLabel">Award Points</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="awardPointsForm">
+                    <input type="hidden" id="memberId" name="memberId">
+                    <div class="mb-3">
+                        <label for="memberName" class="form-label">Member</label>
+                        <input type="text" class="form-control" id="memberName" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="actionId" class="form-label">Action</label>
+                        <select class="form-select" id="actionId" name="actionId" required>
+                            <option value="">Select an action</option>
+                            <option value="complete_survey">Complete Survey</option>
+                            <option value="attend_event">Attend Event</option>
+                            <option value="refer_friend">Refer Friend</option>
+                            <option value="complete_profile">Complete Profile</option>
+                            <option value="custom">Custom Action</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <input type="text" class="form-control" id="description" name="description" placeholder="Enter a description">
+                    </div>
+                    <div class="mb-3" id="customPointsDiv" style="display: none;">
+                        <label for="points" class="form-label">Points</label>
+                        <input type="number" class="form-control" id="points" name="points" min="1" max="1000" placeholder="Enter points">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="awardPointsBtn">Award Points</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Award points modal
+        $(".award-points-btn").click(function() {
+            var memberId = $(this).data("member-id");
+            var memberName = $(this).data("member-name");
+            
+            $("#memberId").val(memberId);
+            $("#memberName").val(memberName);
+            
+            $("#awardPointsModal").modal("show");
+        });
+        
+        // Show custom points field when custom action is selected
+        $("#actionId").change(function() {
+            if ($(this).val() === "custom") {
+                $("#customPointsDiv").show();
+            } else {
+                $("#customPointsDiv").hide();
+            }
+        });
+        
+        // Award points
+        $("#awardPointsBtn").click(function() {
+            var memberId = $("#memberId").val();
+            var actionId = $("#actionId").val();
+            var description = $("#description").val();
+            var points = $("#points").val();
+            
+            if (!actionId) {
+                alert("Please select an action");
+                return;
+            }
+            
+            if (actionId === "custom" && !points) {
+                alert("Please enter points for custom action");
+                return;
+            }
+            
+            // Prepare data
+            var data = {
+                action_id: actionId,
+                description: description
+            };
+            
+            if (actionId === "custom") {
+                data.points = parseInt(points);
+            }
+            
+            // Send request
+            $.ajax({
+                url: "/api/members/" + memberId + "/award-points",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(data),
+                success: function(response) {
+                    if (response.success) {
+                        alert("Points awarded successfully!");
+                        $("#awardPointsModal").modal("hide");
+                        location.reload();
+                    } else {
+                        alert("Error: " + response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert("Error: " + error);
+                }
+            });
+        });
+        
+        // Check achievements
+        $(".check-achievements-btn").click(function() {
+            var memberId = $(this).data("member-id");
+            
+            $.ajax({
+                url: "/api/members/" + memberId + "/check-achievements",
+                type: "POST",
+                success: function(response) {
+                    if (response.success) {
+                        if (response.new_achievements && response.new_achievements.length > 0) {
+                            alert("New achievements earned: " + response.new_achievements.map(a => a.name).join(", "));
+                        } else {
+                            alert("No new achievements earned");
+                        }
+                        location.reload();
+                    } else {
+                        alert("Error: " + response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert("Error: " + error);
+                }
+            });
+        });
+        
+        // Complete challenge
+        $(".complete-challenge-btn").click(function() {
+            var memberId = $(this).data("member-id");
+            var challengeId = $(this).data("challenge-id");
+            
+            $.ajax({
+                url: "/api/members/" + memberId + "/complete-challenge/" + challengeId,
+                type: "POST",
+                success: function(response) {
+                    if (response.success) {
+                        alert("Challenge completed! Awarded " + response.points_awarded + " points.");
+                        location.reload();
+                    } else {
+                        alert("Error: " + response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert("Error: " + error);
+                }
+            });
+        });
+        
+        // Mark notification as read
+        $(".mark-read-btn").click(function() {
+            var notificationId = $(this).data("notification-id");
+            
+            $.ajax({
+                url: "/api/notifications/" + notificationId + "/read",
+                type: "POST",
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert("Error: " + response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert("Error: " + error);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

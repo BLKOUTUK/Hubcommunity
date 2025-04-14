@@ -38,6 +38,8 @@ app_logger.info("Starting BLKOUT NXT Backend")
 from member_manager import MemberManager
 from email_sender import EmailSender
 from survey_handler import SurveyHandler
+from rewards_manager import RewardsManager
+from heartbeat_integration import HeartbeatIntegration
 
 app = Flask(__name__)
 
@@ -45,6 +47,8 @@ app = Flask(__name__)
 member_manager = MemberManager()
 survey_handler = SurveyHandler()
 email_sender = EmailSender()
+rewards_manager = RewardsManager()
+heartbeat = HeartbeatIntegration()
 
 # Get Tally signing secret from environment variables
 TALLY_SIGNING_SECRET = os.environ.get('TALLY_SIGNING_SECRET', '')
@@ -264,6 +268,117 @@ def send_reminders():
         app_logger.error(f"Error sending reminders: {str(e)}")
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
+@app.route('/api/rewards/user/<member_id>', methods=['GET'])
+def get_user_rewards(member_id):
+    """Get a user's rewards profile."""
+    try:
+        # Get the user's rewards profile
+        rewards = rewards_manager.get_user_rewards(member_id)
+
+        if not rewards:
+            return jsonify({"success": False, "message": "Rewards profile not found"}), 404
+
+        return jsonify({"success": True, "rewards": rewards}), 200
+    except Exception as e:
+        app_logger.error(f"Error getting user rewards: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+@app.route('/api/rewards/actions', methods=['GET'])
+def get_reward_actions():
+    """Get all reward actions."""
+    try:
+        # Get all reward actions
+        actions = rewards_manager.get_reward_actions()
+
+        return jsonify({"success": True, "actions": actions}), 200
+    except Exception as e:
+        app_logger.error(f"Error getting reward actions: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+@app.route('/api/rewards/achievements', methods=['GET'])
+def get_achievements():
+    """Get all achievements."""
+    try:
+        # Get all achievements
+        achievements = rewards_manager.get_achievements()
+
+        return jsonify({"success": True, "achievements": achievements}), 200
+    except Exception as e:
+        app_logger.error(f"Error getting achievements: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+@app.route('/api/rewards/leaderboard', methods=['GET'])
+def get_leaderboard():
+    """Get the rewards leaderboard."""
+    try:
+        # Get all user rewards
+        all_rewards = rewards_manager.get_all_user_rewards()
+
+        # Sort by points (descending)
+        leaderboard = sorted(all_rewards, key=lambda x: x.get("current_points", 0), reverse=True)
+
+        # Add member details
+        for entry in leaderboard:
+            member = member_manager.get_member(member_id=entry.get("member_id"))
+            if member:
+                entry["name"] = member.get("name", "Unknown")
+                entry["email"] = member.get("email", "")
+                entry["member_type"] = member.get("member_type", "")
+
+        return jsonify({"success": True, "leaderboard": leaderboard}), 200
+    except Exception as e:
+        app_logger.error(f"Error getting leaderboard: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+@app.route('/api/rewards/award', methods=['POST'])
+def award_points():
+    """Award points to a user."""
+    try:
+        # Get the request data
+        data = request.json
+
+        # Validate the data
+        if not data:
+            return jsonify({"success": False, "message": "No data received"}), 400
+
+        member_id = data.get("member_id")
+        action_id = data.get("action_id")
+        description = data.get("description")
+
+        if not member_id or not action_id:
+            return jsonify({"success": False, "message": "member_id and action_id are required"}), 400
+
+        # Award the points
+        result = rewards_manager.award_points(member_id, action_id, description)
+
+        if not result["success"]:
+            return jsonify(result), 400
+
+        # Update Heartbeat profile if possible
+        try:
+            # Get the member
+            member = member_manager.get_member(member_id=member_id)
+
+            if member:
+                # Find the user in Heartbeat by email
+                heartbeat_user = heartbeat.find_user_by_email(member["email"])
+
+                if heartbeat_user["success"] and "data" in heartbeat_user and heartbeat_user["data"]:
+                    # Get the user's rewards profile
+                    rewards = rewards_manager.get_user_rewards(member_id)
+
+                    if rewards:
+                        # Update the user's Heartbeat profile with rewards information
+                        heartbeat_id = heartbeat_user["data"].get("id")
+                        heartbeat.update_user_rewards(heartbeat_id, rewards)
+        except Exception as e:
+            app_logger.error(f"Error updating Heartbeat profile: {str(e)}")
+
+        return jsonify(result), 200
+    except Exception as e:
+        app_logger.error(f"Error awarding points: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
 @app.route('/', methods=['GET', 'POST'])
 def home():
     """Home page and fallback webhook handler."""
@@ -325,6 +440,27 @@ def home():
             <li><code>GET /api/members/{member_id}</code> - Get a specific member</li>
             <li><code>POST /api/send-reminders</code> - Send reminder emails</li>
         </ul>
+
+        <h2>Rewards API Endpoints</h2>
+        <ul>
+            <li><code>GET /api/rewards/user/{member_id}</code> - Get a user's rewards profile</li>
+            <li><code>GET /api/rewards/actions</code> - Get all reward actions</li>
+            <li><code>GET /api/rewards/achievements</code> - Get all achievements</li>
+            <li><code>GET /api/rewards/leaderboard</code> - Get the rewards leaderboard</li>
+            <li><code>POST /api/rewards/award</code> - Award points to a user</li>
+        </ul>
+
+        <h2>Example Award Points Request</h2>
+        <pre>
+POST /api/rewards/award
+Content-Type: application/json
+
+{
+    "member_id": "123456",
+    "action_id": "complete_survey",
+    "description": "Completed the ally survey"
+}
+        </pre>
 
         <h2>Example Signup Webhook Request</h2>
         <pre>

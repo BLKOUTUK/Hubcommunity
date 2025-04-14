@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Members - BLKOUTHUB{% endblock %}
+
+{% block page_title %}Members{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <i class="fas fa-users me-2"></i> All Members
+        </div>
+        <div>
+            <input type="text" id="memberSearch" class="form-control form-control-sm" placeholder="Search members...">
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="membersTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Type</th>
+                        <th>Level</th>
+                        <th>Points</th>
+                        <th>Achievements</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member in members %}
+                    <tr>
+                        <td>{{ member.name }}</td>
+                        <td>{{ member.email }}</td>
+                        <td>{{ member.member_type }}</td>
+                        <td><span class="badge badge-level">Level {{ member.level }}</span></td>
+                        <td><span class="badge badge-points">{{ member.points }} pts</span></td>
+                        <td><span class="badge badge-achievement">{{ member.achievements }}</span></td>
+                        <td>
+                            <a href="{{ url_for('member_detail', member_id=member.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye"></i> View
+                            </a>
+                            <button class="btn btn-sm btn-success award-points-btn" data-member-id="{{ member.id }}" data-member-name="{{ member.name }}">
+                                <i class="fas fa-plus-circle"></i> Award Points
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">No members found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Award Points Modal -->
+<div class="modal fade" id="awardPointsModal" tabindex="-1" aria-labelledby="awardPointsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="awardPointsModalLabel">Award Points</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="awardPointsForm">
+                    <input type="hidden" id="memberId" name="memberId">
+                    <div class="mb-3">
+                        <label for="memberName" class="form-label">Member</label>
+                        <input type="text" class="form-control" id="memberName" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="actionId" class="form-label">Action</label>
+                        <select class="form-select" id="actionId" name="actionId" required>
+                            <option value="">Select an action</option>
+                            <option value="complete_survey">Complete Survey</option>
+                            <option value="attend_event">Attend Event</option>
+                            <option value="refer_friend">Refer Friend</option>
+                            <option value="complete_profile">Complete Profile</option>
+                            <option value="custom">Custom Action</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <input type="text" class="form-control" id="description" name="description" placeholder="Enter a description">
+                    </div>
+                    <div class="mb-3" id="customPointsDiv" style="display: none;">
+                        <label for="points" class="form-label">Points</label>
+                        <input type="number" class="form-control" id="points" name="points" min="1" max="1000" placeholder="Enter points">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="awardPointsBtn">Award Points</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Search functionality
+        $("#memberSearch").on("keyup", function() {
+            var value = $(this).val().toLowerCase();
+            $("#membersTable tbody tr").filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+            });
+        });
+        
+        // Award points modal
+        $(".award-points-btn").click(function() {
+            var memberId = $(this).data("member-id");
+            var memberName = $(this).data("member-name");
+            
+            $("#memberId").val(memberId);
+            $("#memberName").val(memberName);
+            
+            $("#awardPointsModal").modal("show");
+        });
+        
+        // Show custom points field when custom action is selected
+        $("#actionId").change(function() {
+            if ($(this).val() === "custom") {
+                $("#customPointsDiv").show();
+            } else {
+                $("#customPointsDiv").hide();
+            }
+        });
+        
+        // Award points
+        $("#awardPointsBtn").click(function() {
+            var memberId = $("#memberId").val();
+            var actionId = $("#actionId").val();
+            var description = $("#description").val();
+            var points = $("#points").val();
+            
+            if (!actionId) {
+                alert("Please select an action");
+                return;
+            }
+            
+            if (actionId === "custom" && !points) {
+                alert("Please enter points for custom action");
+                return;
+            }
+            
+            // Prepare data
+            var data = {
+                action_id: actionId,
+                description: description
+            };
+            
+            if (actionId === "custom") {
+                data.points = parseInt(points);
+            }
+            
+            // Send request
+            $.ajax({
+                url: "/api/members/" + memberId + "/award-points",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(data),
+                success: function(response) {
+                    if (response.success) {
+                        alert("Points awarded successfully!");
+                        $("#awardPointsModal").modal("hide");
+                        location.reload();
+                    } else {
+                        alert("Error: " + response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert("Error: " + error);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

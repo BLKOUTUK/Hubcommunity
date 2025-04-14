@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}Rewards - BLKOUTHUB{% endblock %}
+
+{% block page_title %}Rewards System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Reward Actions -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-star me-2"></i> Reward Actions
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Points</th>
+                                <th>Category</th>
+                                <th>One-time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for action in reward_actions %}
+                            <tr>
+                                <td>{{ action.name }}</td>
+                                <td>{{ action.description }}</td>
+                                <td>{{ action.points }}</td>
+                                <td>{{ action.category }}</td>
+                                <td>
+                                    {% if action.one_time %}
+                                    <span class="badge bg-success">Yes</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">No</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center">No reward actions found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Achievements -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-medal me-2"></i> Achievements
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Bonus Points</th>
+                                <th>Requirements</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for achievement in achievements %}
+                            <tr>
+                                <td>{{ achievement.name }}</td>
+                                <td>{{ achievement.description }}</td>
+                                <td>{{ achievement.bonus_points }}</td>
+                                <td>
+                                    {% if achievement.requirements %}
+                                    <ul class="mb-0">
+                                        {% for req in achievement.requirements %}
+                                        <li>
+                                            {% if req.type == 'action' %}
+                                            {{ req.action_id }} ({{ req.count }} times)
+                                            {% elif req.type == 'points' %}
+                                            {{ req.points }} points
+                                            {% elif req.type == 'level' %}
+                                            Level {{ req.level }}
+                                            {% else %}
+                                            {{ req.type }}
+                                            {% endif %}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}
+                                    <span class="text-muted">No requirements</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center">No achievements found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Access Levels -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-key me-2"></i> Access Levels
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="accessLevelsAccordion">
+                    {% for level in access_levels %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ level.id }}">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ level.id }}" aria-expanded="false" aria-controls="collapse{{ level.id }}">
+                                {{ level.name }} (Level {{ level.min_level }}+)
+                            </button>
+                        </h2>
+                        <div id="collapse{{ level.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ level.id }}" data-bs-parent="#accessLevelsAccordion">
+                            <div class="accordion-body">
+                                <p>{{ level.description }}</p>
+                                <h6>Features:</h6>
+                                <ul>
+                                    {% for feature in level.features %}
+                                    <li>{{ feature }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-center">No access levels found</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Challenges -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-tasks me-2"></i> Challenges
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="challengesAccordion">
+                    {% for challenge in challenges %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingChallenge{{ loop.index }}">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseChallenge{{ loop.index }}" aria-expanded="false" aria-controls="collapseChallenge{{ loop.index }}">
+                                {{ challenge.name }} ({{ challenge.points }} points)
+                            </button>
+                        </h2>
+                        <div id="collapseChallenge{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="headingChallenge{{ loop.index }}" data-bs-parent="#challengesAccordion">
+                            <div class="accordion-body">
+                                <p>{{ challenge.description }}</p>
+                                <h6>Requirements:</h6>
+                                <ul>
+                                    {% for req in challenge.requirements %}
+                                    <li>
+                                        {% if req.type == 'action' %}
+                                        {{ req.action_id }} ({{ req.count }} times)
+                                        {% elif req.type == 'level' %}
+                                        Reach level {{ req.level }}
+                                        {% else %}
+                                        {{ req.type }}
+                                        {% endif %}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                <p>
+                                    <strong>Status:</strong> 
+                                    {% if challenge.status == 'active' %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ challenge.status }}</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-center">No challenges found</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Exclusive Content -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-lock me-2"></i> Exclusive Content
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Required Level</th>
+                                <th>Access Level</th>
+                                <th>Content Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for content in exclusive_content %}
+                            <tr>
+                                <td>{{ content.name }}</td>
+                                <td>{{ content.description }}</td>
+                                <td>{{ content.required_level }}</td>
+                                <td>{{ content.access_level }}</td>
+                                <td>{{ content.content_type }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center">No exclusive content found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

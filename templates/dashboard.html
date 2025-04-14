@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - BLKOUTHUB{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Statistics Cards -->
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <i class="fas fa-users"></i>
+            <div class="stat-value">{{ member_count }}</div>
+            <div class="stat-label">Total Members</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <i class="fas fa-trophy"></i>
+            <div class="stat-value">{{ total_points }}</div>
+            <div class="stat-label">Total Points Awarded</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <i class="fas fa-calendar-alt"></i>
+            <div class="stat-value">{{ event_count }}</div>
+            <div class="stat-label">Total Events</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <i class="fas fa-bell"></i>
+            <div class="stat-value">{{ notification_count }}</div>
+            <div class="stat-label">Total Notifications</div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Top Members -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-star me-2"></i> Top Members
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Level</th>
+                                <th>Points</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in top_members %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('member_detail', member_id=member.member_id) }}">
+                                        {{ member.name }}
+                                    </a>
+                                </td>
+                                <td><span class="badge badge-level">Level {{ member.level }}</span></td>
+                                <td><span class="badge badge-points">{{ member.current_points }} pts</span></td>
+                                <td>{{ member.member_type }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center">No members found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="{{ url_for('members') }}" class="btn btn-sm btn-primary">View All Members</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Upcoming Events -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-calendar-alt me-2"></i> Upcoming Events
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Date</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in upcoming_events_list %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('event_detail', event_id=event.id) }}">
+                                        {{ event.name }}
+                                    </a>
+                                </td>
+                                <td>{{ event.event_date.split('T')[0] }}</td>
+                                <td>{{ event.location }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center">No upcoming events</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="{{ url_for('events') }}" class="btn btn-sm btn-primary">View All Events</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Recent Notifications -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bell me-2"></i> Recent Notifications
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Member</th>
+                                <th>Title</th>
+                                <th>Message</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for notification in recent_notifications %}
+                            <tr>
+                                <td>
+                                    {% if notification.type == 'achievement' %}
+                                    <span class="badge badge-achievement">Achievement</span>
+                                    {% elif notification.type == 'level_up' %}
+                                    <span class="badge badge-level">Level Up</span>
+                                    {% elif notification.type == 'challenge_completion' %}
+                                    <span class="badge badge-points">Challenge</span>
+                                    {% elif notification.type == 'access_level_change' %}
+                                    <span class="badge badge-event">Access Level</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ notification.type }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('member_detail', member_id=notification.member_id) }}">
+                                        {{ notification.member_name }}
+                                    </a>
+                                </td>
+                                <td>{{ notification.title }}</td>
+                                <td>{{ notification.message }}</td>
+                                <td>{{ notification.created_at.split('T')[0] }}</td>
+                                <td>
+                                    {% if notification.read %}
+                                    <span class="badge bg-success">Read</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">Unread</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">No notifications found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="{{ url_for('notifications') }}" class="btn btn-sm btn-primary">View All Notifications</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

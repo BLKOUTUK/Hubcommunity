@@ -3,6 +3,8 @@ import os
 import datetime
 import logging
 from member_manager import MemberManager
+from rewards_manager import RewardsManager
+from heartbeat_integration import HeartbeatIntegration
 
 logger = logging.getLogger('blkout_nxt')
 
@@ -12,6 +14,8 @@ class SurveyHandler:
     def __init__(self):
         """Initialize the SurveyHandler."""
         self.member_manager = MemberManager()
+        self.rewards_manager = RewardsManager()
+        self.heartbeat = HeartbeatIntegration()
         self.config = self._load_config()
 
     def _load_config(self):
@@ -48,6 +52,37 @@ class SurveyHandler:
 
             # Record the survey completion
             result = self.member_manager.record_survey_completion(member["id"], survey_data)
+
+            # Award points for survey completion
+            if result["success"]:
+                # Award points for completing the survey
+                points_result = self.rewards_manager.award_points(
+                    member["id"],
+                    "complete_survey",
+                    f"Completed the {survey_type} survey"
+                )
+
+                if points_result["success"]:
+                    logger.info(f"Awarded {points_result['points']} points to {member['id']} for survey completion")
+
+                    # Check for achievements
+                    self.rewards_manager.check_achievements(member["id"])
+
+                    # Update Heartbeat profile if possible
+                    try:
+                        # Find the user in Heartbeat by email
+                        heartbeat_user = self.heartbeat.find_user_by_email(member["email"])
+
+                        if heartbeat_user["success"] and "data" in heartbeat_user and heartbeat_user["data"]:
+                            # Get the user's rewards profile
+                            rewards = self.rewards_manager.get_user_rewards(member["id"])
+
+                            if rewards:
+                                # Update the user's Heartbeat profile with rewards information
+                                heartbeat_id = heartbeat_user["data"].get("id")
+                                self.heartbeat.update_user_rewards(heartbeat_id, rewards)
+                    except Exception as e:
+                        logger.error(f"Error updating Heartbeat profile: {str(e)}")
 
             return {"success": result["success"], "message": result["message"], "member_id": member["id"]}
         except Exception as e:
