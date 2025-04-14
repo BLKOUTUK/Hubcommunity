@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: blkouthub-rewards-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn rewards_api:app
+    envVars:
+      - key: HEARTBEAT_API_KEY
+        sync: false
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: SMTP_SERVER
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: FLASK_ENV
+        value: production
+    disk:
+      name: blkouthub-data
+      mountPath: /data
+      sizeGB: 10
+
+  - type: web
+    name: blkouthub-dashboard
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn dashboard:app
+    envVars:
+      - key: HEARTBEAT_API_KEY
+        sync: false
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: API_URL
+        value: https://blkouthub-rewards-api.onrender.com
+      - key: FLASK_ENV
+        value: production
+    disk:
+      name: blkouthub-dashboard-data
+      mountPath: /data
+      sizeGB: 5
